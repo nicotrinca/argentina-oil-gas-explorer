@@ -1,0 +1,22 @@
+# Python / local env
+.venv/
+__pycache__/
+*.pyc
+.claude/
+
+# Downloaded and generated data (re-create with the preprocess scripts)
+data/
+outputs/
+
+# Heavy data anywhere in the tree
+*.csv
+*.tif
+*.tiff
+*.zip
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.sbn
+*.sbx

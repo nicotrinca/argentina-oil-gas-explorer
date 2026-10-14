@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pozos Petroleros Argentina — Cap. IV</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<style>
+  :root {
+    /* Paleta */
+    --bg:        #0f1117;
+    --panel:     #1b1f2b;
+    --panel-2:   #232838;
+    --panel-3:   #2b3145;
+    --border:    #333a52;
+    --accent:    #58bdf6;
+    --accent-dk: #12476f;
+    --accent-bg: #163b5c;
+    /* Texto: contraste mejorado para fondo oscuro */
+    --text:      #eef3fb;
+    --text-dim:  #c2cde3;
+    --text-mute: #93a1c2;
+    --up:        #4fd987;
+    --down:      #f06a6a;
+    /* Tipografía: escala mayor y stack moderno */
+    --font: 'Segoe UI', system-ui, -apple-system, 'Inter', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font); display: flex; height: 100vh; overflow: hidden;
+    background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4262; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 350px; min-width: 320px; background: var(--panel); color: var(--text);
+    display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 16px #0009;
+  }
+  #sidebar header {
+    background: linear-gradient(135deg, #0d3b6e, #1f78b4);
+    padding: 18px 18px 14px; flex-shrink: 0;
+  }
+  #sidebar header h1 { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: .2px; }
+  #sidebar header p  { font-size: 14px; color: #bcdcf6; margin-top: 4px; }
+
+  /* ── Totales ── */
+  #totales {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 14px; background: #14171f; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .stat-box {
+    background: var(--panel-2); border-radius: 9px; padding: 11px 12px; text-align: center;
+    border: 1px solid #2a3046;
+  }
+  .stat-box .val { font-size: 24px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .stat-box .lbl { font-size: 13px; color: var(--text-mute); margin-top: 5px; }
+
+  /* ── Tabs ── */
+  #tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .tab-btn {
+    flex: 1; padding: 13px 8px; background: none; border: none; color: var(--text-mute);
+    font-size: 13px; font-weight: 600; cursor: pointer; letter-spacing: .4px;
+    text-transform: uppercase; border-bottom: 2px solid transparent; transition: all .15s; font-size: 14px;
+  }
+  .tab-btn:hover { color: var(--text-dim); background: #ffffff08; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-pane { display: none; flex: 1; overflow-y: auto; }
+  .tab-pane.active { display: flex; flex-direction: column; }
+
+  /* ── Filtros ── */
+  #tab-filtros { padding: 16px; gap: 13px; }
+  .filter-group label { display: block; font-size: 14px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
+  .filter-group select, .filter-group input[type=range], .filter-group input[type=text] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 7px; padding: 11px 13px; font-size: 15px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  /* ── Buscador ── */
+  #search-results {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 1200;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+    margin-top: 4px; max-height: 260px; overflow-y: auto; display: none; box-shadow: 0 6px 18px #0008;
+  }
+  #search-results.show { display: block; }
+  .sr-item { padding: 10px 13px; cursor: pointer; border-bottom: 1px solid #2a3046; }
+  .sr-item:last-child { border-bottom: none; }
+  .sr-item:hover { background: var(--panel-3); }
+  .sr-item .sr-sig { font-size: 14px; font-weight: 600; color: var(--text); }
+  .sr-item .sr-sub { font-size: 12px; color: var(--text-mute); }
+  .sr-empty { padding: 10px 13px; font-size: 13px; color: var(--text-mute); }
+  #btn-export {
+    padding: 11px; background: var(--panel-2); color: var(--text-mute);
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  #btn-export:hover { color: var(--text-dim); }
+  .filter-group select:focus, .filter-group input:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px #58bdf633;
+  }
+  .filter-group select { appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2393a1c2' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+  }
+  .filter-group select option { background: var(--panel-2); }
+  input[type=range] { -webkit-appearance: none; padding: 0 !important; height: 6px; background: var(--panel-3) !important; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 3px solid var(--panel);
+  }
+  .range-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-mute); margin-top: 6px; }
+  .range-row span:last-child { color: var(--accent); font-weight: 600; }
+  #btn-reset {
+    padding: 11px; background: var(--accent-bg); color: #cfe8fb;
+    border: 1px solid #235980; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600;
+    transition: background .15s;
+  }
+  #btn-reset:hover { background: #1e5c99; }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-mute); margin: 14px 0 8px; font-weight: 700; }
+  .cuenca-row { padding: 9px 8px; border-radius: 7px; cursor: pointer; transition: background .15s; }
+  .cuenca-row:hover { background: var(--panel-2); }
+  .cuenca-row.active { background: var(--accent-bg); }
+  .cuenca-row .cname { font-size: 15px; font-weight: 600; color: var(--text-dim); }
+  .cuenca-row .cbar-wrap { height: 5px; background: var(--panel-2); border-radius: 3px; margin: 6px 0; }
+  .cuenca-row .cbar { height: 5px; border-radius: 3px; background: linear-gradient(90deg, #f0a000, #e03020); }
+  .cuenca-row .cstats { font-size: 12px; color: var(--text-mute); display: flex; gap: 10px; }
+
+  /* ── Tendencia ── */
+  #tab-tendencia { padding: 16px; gap: 12px; }
+  #tab-tendencia .section-title { margin-top: 0; }
+  .chart-wrap { background: #14171f; border-radius: 9px; padding: 13px; border: 1px solid #2a3046; }
+  .chart-wrap canvas { width: 100% !important; }
+  .chart-label { font-size: 12px; color: var(--text-mute); margin-bottom: 8px; }
+  .cuenca-selector { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .cuenca-chip {
+    padding: 6px 12px; border-radius: 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+    background: var(--panel-2); color: var(--text-mute); border: 1px solid var(--border); transition: all .15s;
+  }
+  .cuenca-chip:hover { color: var(--text-dim); }
+  .cuenca-chip.active { color: #fff; border-color: transparent; }
+  .metric-btn {
+    flex: 1; padding: 9px; background: var(--panel-2); color: var(--text-mute);
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s;
+  }
+  .metric-btn:hover { color: var(--text-dim); }
+  .metric-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+
+  /* ── Botones métrica mapa ── */
+  .map-metric-btn {
+    padding: 11px; background: var(--panel-2); color: var(--text-mute);
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .15s;
+  }
+  .map-metric-btn:hover { color: var(--text-dim); }
+  .map-metric-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+
+  /* ── Mapa ── */
+  #map { flex: 1; }
+  .leaflet-control-layers { font-size: 14px !important; border-radius: 9px !important; }
+  .leaflet-control-layers-list { color: #2a3550; }
+  .leaflet-popup-content { font-family: var(--font); }
+
+  /* ── Leyenda ── */
+  .legend {
+    background: #1b1f2bee; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; color: var(--text-dim); font-size: 13px; min-width: 150px;
+    box-shadow: 0 4px 14px #0006;
+  }
+  .legend h4 { font-size: 14px; margin-bottom: 8px; color: var(--text-mute); font-weight: 700; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Popup ── */
+  .lf-popup-empresa { font-weight: 700; font-size: 16px; margin-bottom: 8px; color: #103a5f; }
+  .lf-popup-grid { display: grid; grid-template-columns: auto auto; gap: 5px 14px; font-size: 14px; margin-bottom: 8px; }
+  .lf-popup-grid .k { color: #5a6b7e; }
+  .lf-popup-grid .v { font-weight: 600; color: #1a2533; }
+  .spark-label { font-size: 12px; color: #5a6b7e; margin-bottom: 4px; }
+
+  /* ── Ranking ── */
+  #tab-ranking { padding: 14px; gap: 0; }
+  .rank-btn {
+    flex: 1; padding: 9px 5px; background: var(--panel-2); color: var(--text-mute);
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s;
+  }
+  .rank-btn:hover { color: var(--text-dim); }
+  .rank-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+  .rank-row {
+    padding: 11px 5px; border-bottom: 1px solid #232838; cursor: pointer;
+    display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center;
+  }
+  .rank-row:hover { background: var(--panel-2); }
+  .rank-num { font-size: 14px; font-weight: 700; color: #56688a; text-align: right; }
+  .rank-info .rname { font-size: 14px; font-weight: 600; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank-info .remp  { font-size: 13px; color: var(--text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank-val { font-size: 14px; font-weight: 700; text-align: right; white-space: nowrap; }
+  .val-up   { color: var(--up); }
+  .val-down { color: var(--down); }
+  .val-neu  { color: var(--accent); }
+
+  /* ── Botón en popup ── */
+  .popup-btn {
+    width: 100%; padding: 9px; margin-top: 2px; background: #103a5f; color: #cfe8fb;
+    border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .popup-btn:hover { background: #1a5286; }
+
+  /* ── Banner de área activa ── */
+  #area-banner {
+    display: none; align-items: center; justify-content: space-between; gap: 8px;
+    background: var(--accent-bg); border: 1px solid #235980; border-radius: 8px;
+    padding: 10px 12px; color: #cfe8fb; font-size: 14px; font-weight: 600;
+  }
+  #area-banner span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #area-banner button {
+    background: none; border: none; color: #9ec8e8; cursor: pointer; font-size: 16px;
+    line-height: 1; flex-shrink: 0; padding: 2px 4px;
+  }
+  #area-banner button:hover { color: #fff; }
+
+  /* ── Animación temporal ── */
+  #anim-control {
+    background: #1b1f2bee; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; color: var(--text-dim); box-shadow: 0 4px 14px #0006; min-width: 260px;
+  }
+  #anim-control .anim-top { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  #anim-play {
+    background: var(--accent); color: #0a1420; border: none; border-radius: 6px;
+    width: 34px; height: 34px; cursor: pointer; font-size: 15px; flex-shrink: 0; font-weight: 700;
+  }
+  #anim-period { font-size: 15px; font-weight: 700; color: var(--accent); }
+  #anim-hint { font-size: 12px; color: var(--text-mute); }
+  #anim-slider { width: 100%; }
+  #anim-close { margin-left: auto; background: none; border: none; color: var(--text-mute); cursor: pointer; font-size: 16px; }
+  #anim-close:hover { color: var(--text); }
+  #btn-anim {
+    padding: 11px; background: var(--panel-2); color: var(--text-mute);
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  #btn-anim:hover { color: var(--text-dim); }
+
+  /* ── Loading ── */
+  #loading {
+    position: fixed; inset: 0; background: #0f1117ee; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    color: #bcdcf6; z-index: 9999;
+  }
+  #loading p { margin-top: 16px; font-size: 15px; }
+  .spinner { width: 44px; height: 44px; border: 4px solid #2a3a5a; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><p>Cargando pozos...</p></div>
+
+<div id="sidebar">
+  <header>
+    <h1>Pozos Petroleros — Argentina</h1>
+    <p>Capítulo IV · 2022–2026</p>
+  </header>
+
+  <div id="totales">
+    <div class="stat-box"><div class="val" id="t-pozos">—</div><div class="lbl">Pozos activos</div></div>
+    <div class="stat-box"><div class="val" id="t-pet">—</div><div class="lbl">Petróleo m³ (<span class="t-year">2024</span>)</div></div>
+    <div class="stat-box"><div class="val" id="t-gas">—</div><div class="lbl">Gas Mm³ (<span class="t-year">2024</span>)</div></div>
+    <div class="stat-box"><div class="val" id="t-emp">—</div><div class="lbl">Empresas</div></div>
+  </div>
+
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="filtros">Mapa</button>
+    <button class="tab-btn" data-tab="tendencia">Tendencia</button>
+    <button class="tab-btn" data-tab="ranking">Ranking</button>
+  </div>
+
+  <div id="tab-filtros" class="tab-pane active">
+    <div id="area-banner"><span></span><button id="area-banner-x" title="Quitar filtro de área">✕</button></div>
+    <div class="filter-group" style="position:relative">
+      <label>Buscar pozo por sigla</label>
+      <input type="text" id="f-search" placeholder="Ej: LLL-1001, YPF.Nq..." autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+    <div class="filter-group">
+      <label>Año</label>
+      <select id="f-year">
+        <option value="2026">2026</option>
+        <option value="2025">2025</option>
+        <option value="2024" selected>2024</option>
+        <option value="2023">2023</option>
+        <option value="2022">2022</option>
+      </select>
+    </div>
+    <div class="filter-group" style="margin-bottom:-4px"><label>Colorear el mapa por</label></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      <button class="map-metric-btn active" data-m="pet" style="flex:1 1 45%">🛢 Petróleo</button>
+      <button class="map-metric-btn" data-m="gas" style="flex:1 1 45%">⛽ Gas</button>
+      <button class="map-metric-btn" data-m="gor" style="flex:1 1 45%">📈 GOR</button>
+      <button class="map-metric-btn" data-m="wcut" style="flex:1 1 45%">💧 Corte agua</button>
+    </div>
+    <div class="filter-group">
+      <label>Cuenca</label>
+      <select id="f-cuenca"><option value="">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Provincia</label>
+      <select id="f-prov"><option value="">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Empresa</label>
+      <select id="f-emp"><option value="">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Tipo de recurso</label>
+      <select id="f-tipo"><option value="">Todos</option></select>
+    </div>
+    <div class="filter-group">
+      <label id="minpet-lbl">Prod. mín. petróleo (m³)</label>
+      <input type="range" id="f-minpet" min="0" max="100000" value="0" step="100">
+      <div class="range-row"><span>0</span><span id="f-minpet-val">0</span></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button id="btn-reset" style="flex:1">Resetear</button>
+      <button id="btn-noconv" style="flex:1;padding:8px;background:#2a1a5a;color:#b090f0;border:1px solid #5a3a9a;border-radius:5px;cursor:pointer;font-size:13px">No Conv.</button>
+    </div>
+    <button id="btn-anim" style="margin-top:6px;width:100%">▶ Animar últimos 24 meses</button>
+    <button id="btn-export" style="margin-top:6px;width:100%">⬇ Exportar vista a CSV</button>
+    <div class="section-title" style="margin-top:12px">Por cuenca (<span class="t-year">2024</span>)</div>
+    <div id="cuencas-list"></div>
+  </div>
+
+  <div id="tab-tendencia" class="tab-pane">
+    <div class="section-title">Nacional — Producción mensual</div>
+    <div class="chart-wrap">
+      <div class="chart-label">Petróleo m³ · Gas Mm³</div>
+      <canvas id="chart-nacional" height="120"></canvas>
+    </div>
+    <div class="section-title">Comparar cuencas <span style="color:#5a6a8a;font-weight:400;text-transform:none">(selección múltiple)</span></div>
+    <div class="cuenca-selector" id="cuenca-chips"></div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button id="btn-metric-pet" class="metric-btn active" data-metric="pet">Petróleo m³</button>
+      <button id="btn-metric-gas" class="metric-btn" data-metric="gas">Gas Mm³</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart-cuenca" height="150"></canvas>
+    </div>
+    <div class="section-title" style="margin-top:14px">Comparar empresas <span style="color:#5a6a8a;font-weight:400;text-transform:none">(top 15 · usa los botones de arriba)</span></div>
+    <div class="cuenca-selector" id="empresa-chips"></div>
+    <div class="chart-wrap">
+      <canvas id="chart-empresa" height="150"></canvas>
+    </div>
+  </div>
+
+  <div id="tab-ranking" class="tab-pane">
+    <div style="display:flex;gap:4px;margin-bottom:8px;flex-shrink:0">
+      <button class="rank-btn active" data-rank="top_productores">Top prod.</button>
+      <button class="rank-btn" data-rank="top_crecimiento">↑ Crecimiento</button>
+      <button class="rank-btn" data-rank="top_caida">↓ Caída</button>
+    </div>
+    <div id="ranking-list"></div>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script id="pozos-year-script" src="data/pozos_2024.js"></script>
+<script>
+// ── Constantes ────────────────────────────────────────────────────────────
+const I = { lat:0, lon:1, pet:2, gas:3, agua:4, emp:5, cu:6, prov:7, tr:8, form:9, ma:10, est:11, sigla:12 };
+
+// Paleta para cuencas en el comparador (hasta 8)
+const CUENCA_COLORS = ['#4db6f0','#e07020','#50e080','#f0c040','#e050b0','#a070f0','#50c0c0','#f08080'];
+
+Chart.defaults.color = '#93a1c2';
+Chart.defaults.font.size = 13;
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+// ── Mapa ──────────────────────────────────────────────────────────────────
+const map = L.map('map', { center: [-38, -65], zoom: 5 });
+
+const baseDark = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© Esri, HERE, Garmin, © OpenStreetMap', maxZoom: 16
+}).addTo(map);
+
+const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© Esri, Maxar, Earthstar Geographics', maxZoom: 19
+});
+
+// Etiquetas opcionales encima del satélite
+const satLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 16
+});
+baseSat.on('add', () => satLabels.addTo(map));
+baseSat.on('remove', () => map.removeLayer(satLabels));
+
+// Capa de áreas hidrocarburíferas (concesiones nacionales)
+const areaFeatureList = [];
+const areasLayer = L.geoJSON(null, {
+  style: f => ({
+    color: f.properties.noconv ? '#c060f0' : '#4db6f0',
+    weight: 1, fillColor: f.properties.noconv ? '#c060f0' : '#4db6f0',
+    fillOpacity: 0.08,
+  }),
+  onEachFeature: (f, lyr) => {
+    const p = f.properties;
+    f._idx = areaFeatureList.length; areaFeatureList.push(f);
+    lyr.bindPopup(`
+      <div class="lf-popup-empresa">${p.nombre || '—'}${p.noconv ? ' <span style="color:#c060f0">· NC</span>' : ''}</div>
+      <div class="lf-popup-grid">
+        <span class="k">Operador</span>  <span class="v">${p.operador || '—'}</span>
+        <span class="k">Pozos (2025)</span><span class="v">${(p.n_pozos||0).toLocaleString('es-AR')}</span>
+        <span class="k">Petróleo m³</span><span class="v">${(p.pet||0).toLocaleString('es-AR')}</span>
+        <span class="k">Gas Mm³</span>   <span class="v">${Math.round((p.gas||0)/1000).toLocaleString('es-AR')}</span>
+        <span class="k">Provincia</span> <span class="v">${p.prov_pozos || '—'}</span>
+        <span class="k">Actualizado</span><span class="v">${p.mod || '—'}</span>
+      </div>${p.socios ? `<div class="spark-label" style="margin-top:6px">Participación</div><div style="font-size:12px;color:#5a6b7e;margin-bottom:8px">${p.socios}</div>` : ''}
+      <button class="popup-btn" onclick="filterByArea(${f._idx})">📍 Ver solo los pozos de esta área</button>`,
+      { maxWidth: 300 });
+    lyr.on('mouseover', () => lyr.setStyle({ fillOpacity: 0.25, weight: 2 }));
+    lyr.on('mouseout',  () => areasLayer.resetStyle(lyr));
+  },
+});
+fetch('data/areas.geojson').then(r => r.json()).then(d => areasLayer.addData(d));
+
+// ── Point-in-polygon (ray casting) sobre geometría GeoJSON [lng,lat] ───────
+function pipRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function pointInPolygon(lng, lat, poly) {        // poly = [outer, hole, ...]
+  if (!pipRing(lng, lat, poly[0])) return false;
+  for (let k = 1; k < poly.length; k++) if (pipRing(lng, lat, poly[k])) return false;
+  return true;
+}
+function makeAreaTest(geom) {
+  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+  return (lng, lat) => polys.some(poly => pointInPolygon(lng, lat, poly));
+}
+
+// ── Filtrar pozos por área de concesión ────────────────────────────────────
+window.filterByArea = function (idx) {
+  const f = areaFeatureList[idx];
+  const test = makeAreaTest(f.geometry);
+  areaFilter = r => test(r[I.lon], r[I.lat]);
+  map.closePopup();
+  document.querySelector('.tab-btn[data-tab="filtros"]').click();
+  applyFilters();
+  const b = document.getElementById('area-banner');
+  b.style.display = 'flex';
+  b.querySelector('span').textContent = '📍 ' + (f.properties.nombre || 'Área') +
+    ' · ' + lastFiltered.length.toLocaleString('es-AR') + ' pozos';
+};
+function clearAreaFilter() {
+  areaFilter = null;
+  document.getElementById('area-banner').style.display = 'none';
+  applyFilters();
+}
+
+L.control.layers(
+  { 'Oscuro': baseDark, 'Satélite': baseSat },
+  { 'Áreas concesión': areasLayer },
+  { position: 'topright', collapsed: false }
+).addTo(map);
+
+// ── Colores y métricas ─────────────────────────────────────────────────────
+let noConvMode = false;
+let mapMetric = 'pet'; // 'pet' | 'gas' | 'gor' | 'wcut'
+// Estado compartido (declarado temprano para evitar TDZ en el init)
+let areaFilter = null;       // función row => bool, o null
+let lastFiltered = [];       // pozos visibles (para la animación)
+let animActive = false, animIdx = 0, animTimer = null;
+
+// GOR = gas (Mm³ -> m³) / petróleo (m³).  Corte de agua = agua/(agua+pet) %.
+const gorVal  = r => r[I.pet] > 0 ? (r[I.gas] * 1000) / r[I.pet] : 0;
+const wcutVal = r => (r[I.pet] + r[I.agua]) > 0 ? r[I.agua] / (r[I.pet] + r[I.agua]) * 100 : 0;
+
+const METRICS = {
+  pet:  { title: 'Prod. petróleo m³', minLbl: 'Prod. mín. petróleo (m³)',
+    val: r => r[I.pet],
+    stops: [[100,'#2a7fc1'],[1000,'#f0c040'],[10000,'#e07020'],[Infinity,'#c01020']],
+    legend: [['Sin prod.','#555577'],['< 100','#2a7fc1'],['< 1k','#f0c040'],['< 10k','#e07020'],['≥ 10k','#c01020']] },
+  gas:  { title: 'Prod. gas Mm³', minLbl: 'Prod. mín. gas (Mm³)',
+    val: r => r[I.gas] / 1000,
+    stops: [[100,'#2a7fc1'],[1000,'#40c0a0'],[10000,'#c0e040'],[Infinity,'#20c040']],
+    legend: [['Sin prod.','#555577'],['< 100','#2a7fc1'],['< 1k','#40c0a0'],['< 10k','#c0e040'],['≥ 10k','#20c040']] },
+  gor:  { title: 'GOR m³/m³', minLbl: 'Prod. mín. petróleo (m³)',
+    val: gorVal,
+    stops: [[200,'#2a7fc1'],[1000,'#40c0a0'],[5000,'#f0c040'],[Infinity,'#e05050']],
+    legend: [['Sin petróleo','#555577'],['Petrolífero < 200','#2a7fc1'],['200–1k','#40c0a0'],['1k–5k','#f0c040'],['Gasífero ≥ 5k','#e05050']] },
+  wcut: { title: 'Corte de agua %', minLbl: 'Prod. mín. petróleo (m³)',
+    val: wcutVal,
+    stops: [[20,'#2a7fc1'],[50,'#40c0a0'],[80,'#f0c040'],[Infinity,'#e05050']],
+    legend: [['Seco / s.d.','#555577'],['< 20%','#2a7fc1'],['< 50%','#40c0a0'],['< 80%','#f0c040'],['≥ 80%','#e05050']] },
+};
+
+function colorByStops(v, stops) {
+  if (v <= 0) return '#555577';
+  for (const [t, c] of stops) if (v < t) return c;
+  return stops[stops.length - 1][1];
+}
+
+function prodColor(r) {
+  if (noConvMode) {
+    const isNC = (r[I.tr] || '').toUpperCase().includes('NO CONV');
+    return isNC ? '#c060f0' : '#2a3a4a';
+  }
+  return colorByStops(METRICS[mapMetric].val(r), METRICS[mapMetric].stops);
+}
+
+// El tamaño del punto siempre refleja el volumen de producción (no la métrica de color)
+function markerRadius(r) {
+  const val = mapMetric === 'gas' ? r[I.gas] / 1000 : r[I.pet];
+  return val > 50000 ? 7 : val > 5000 ? 5 : val > 500 ? 4 : 3;
+}
+
+// ── Leyenda ───────────────────────────────────────────────────────────────
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const d = L.DomUtil.create('div', 'legend');
+  renderLegend(d);
+  return d;
+};
+legend.addTo(map);
+
+function renderLegend(el) {
+  if (noConvMode) {
+    el.innerHTML = '<h4>Tipo recurso</h4>' +
+      '<div class="legend-item"><div class="legend-dot" style="background:#c060f0"></div>No convencional</div>' +
+      '<div class="legend-item"><div class="legend-dot" style="background:#2a3a4a"></div>Convencional</div>';
+    return;
+  }
+  const m = METRICS[mapMetric];
+  el.innerHTML = `<h4>${m.title}</h4>` +
+    m.legend.map(([l,c]) => `<div class="legend-item"><div class="legend-dot" style="background:${c}"></div>${l}</div>`).join('');
+}
+
+// ── Canvas renderer + cluster ─────────────────────────────────────────────
+const canvasRenderer = L.canvas({ padding: 0.5 });
+const clusterGroup = L.markerClusterGroup({
+  maxClusterRadius: 60, chunkedLoading: true, chunkDelay: 10, chunkInterval: 30,
+  disableClusteringAtZoom: 12,
+  iconCreateFunction: cluster => {
+    const n = cluster.getChildCount();
+    const sz = n > 500 ? 40 : n > 100 ? 32 : 24;
+    const bg = noConvMode ? '#3a1a6a' : '#1a5a9a';
+    const border = noConvMode ? '#c060f0' : '#4db6f0';
+    return L.divIcon({
+      html: `<div style="width:${sz}px;height:${sz}px;background:${bg}cc;border:2px solid ${border};border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:${sz>32?12:10}px;font-weight:700">${n>999?Math.round(n/1000)+'k':n}</div>`,
+      className: '', iconSize: [sz, sz]
+    });
+  }
+}).addTo(map);
+
+// ── Datos async ───────────────────────────────────────────────────────────
+let sparkData = null;
+fetch('data/sparklines.json').then(r => r.json()).then(d => { sparkData = d; });
+
+let serieNacional = null, serieCuencas = null;
+Promise.all([
+  fetch('data/serie_nacional.json').then(r => r.json()),
+  fetch('data/serie_cuencas.json').then(r => r.json()),
+  fetch('data/serie_empresas.json').then(r => r.json()),
+]).then(([nac, cuen, emp]) => {
+  serieNacional = nac;
+  serieCuencas  = cuen;
+  serieEmpresas = emp;
+  buildNacionalChart();
+  buildCuencaChips();
+  buildEmpresaChips();
+});
+
+// ── Filtros ───────────────────────────────────────────────────────────────
+function populateFilters() {
+  // Cuencas y provincias
+  const cuencas = [...new Set(window.POZOS.map(r => r[I.cu]))].filter(Boolean).sort();
+  const provs   = [...new Set(window.POZOS.map(r => r[I.prov]))].filter(Boolean).sort();
+  const tipos   = [...new Set(window.POZOS.map(r => r[I.tr]))].filter(Boolean).sort();
+
+  // Empresas: top 50 por producción total
+  const empProd = {};
+  for (const r of window.POZOS) {
+    const e = r[I.emp]; if (!e) continue;
+    empProd[e] = (empProd[e] || 0) + r[I.pet];
+  }
+  const empresas = Object.entries(empProd)
+    .sort((a,b) => b[1]-a[1]).slice(0,50).map(([e]) => e);
+
+  const sel = (id, vals) => {
+    const el = document.getElementById(id);
+    vals.forEach(v => { const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o); });
+  };
+  sel('f-cuenca', cuencas);
+  sel('f-prov', provs);
+  sel('f-emp', empresas);
+  sel('f-tipo', tipos);
+}
+
+function applyFilters() {
+  const cuenca = document.getElementById('f-cuenca').value;
+  const prov   = document.getElementById('f-prov').value;
+  const emp    = document.getElementById('f-emp').value;
+  const tipo   = document.getElementById('f-tipo').value;
+  const minVal = +document.getElementById('f-minpet').value;
+  const minOf  = r => mapMetric === 'gas' ? r[I.gas]/1000 : r[I.pet];
+
+  const filtered = window.POZOS.filter(r =>
+    (!cuenca || r[I.cu]   === cuenca) &&
+    (!prov   || r[I.prov] === prov)   &&
+    (!emp    || r[I.emp]  === emp)    &&
+    (!tipo   || r[I.tr]   === tipo)   &&
+    (!areaFilter || areaFilter(r))    &&
+    minOf(r) >= minVal
+  );
+  lastFiltered = filtered;
+  clusterGroup.clearLayers();
+  buildMarkers(filtered);
+  updateTotals(filtered);
+  if (animActive) animFrame(animIdx);
+}
+
+let currentMarkers = [];
+function buildMarkers(rows) {
+  const markers = rows.map(r => {
+    const m = L.circleMarker([r[I.lat], r[I.lon]], {
+      renderer: canvasRenderer,
+      radius: markerRadius(r),
+      fillColor: prodColor(r), color: '#0003', weight: .5, fillOpacity: .85
+    });
+    m._sigla = r[I.sigla];
+    m.on('click', () => openPopup(m, r));
+    return m;
+  });
+  currentMarkers = markers;
+  clusterGroup.addLayers(markers);
+}
+
+// ── Toggle no convencional ────────────────────────────────────────────────
+document.getElementById('btn-noconv').addEventListener('click', function() {
+  noConvMode = !noConvMode;
+  this.style.background  = noConvMode ? '#4a1a8a' : '#2a1a5a';
+  this.style.color       = noConvMode ? '#e090ff' : '#b090f0';
+  this.style.borderColor = noConvMode ? '#9060e0' : '#5a3a9a';
+  renderLegend(document.querySelector('.legend'));
+  applyFilters();
+});
+
+// ── Toggle métrica del mapa (petróleo / gas) ──────────────────────────────
+document.querySelectorAll('.map-metric-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    mapMetric = this.dataset.m;
+    document.querySelectorAll('.map-metric-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('minpet-lbl').textContent = METRICS[mapMetric].minLbl;
+    renderLegend(document.querySelector('.legend'));
+    applyFilters();
+  });
+});
+
+// ── Banner de área: quitar filtro ──────────────────────────────────────────
+document.getElementById('area-banner-x').addEventListener('click', clearAreaFilter);
+
+// ── Animación temporal (últimos 24 meses, sparklines) ──────────────────────
+const animCtrl = L.control({ position: 'bottomleft' });
+animCtrl.onAdd = () => {
+  const d = L.DomUtil.create('div', '');
+  d.id = 'anim-control';
+  d.innerHTML = `
+    <div class="anim-top">
+      <button id="anim-play">▶</button>
+      <div><div id="anim-period">—</div><div id="anim-hint">Petróleo m³ · mes a mes</div></div>
+      <button id="anim-close" title="Cerrar">✕</button>
+    </div>
+    <input type="range" id="anim-slider" min="0" value="0">`;
+  L.DomEvent.disableClickPropagation(d);
+  return d;
+};
+
+function animColor(v) { return colorByStops(v, METRICS.pet.stops); }
+
+function animFrame(idx) {
+  if (!sparkData) return;
+  animIdx = idx;
+  const per = sparkData.periodos[idx];
+  document.getElementById('anim-period').textContent = per;
+  document.getElementById('anim-slider').value = idx;
+  for (const m of currentMarkers) {
+    const sp = sparkData.pozos[m._sigla];
+    const v = sp ? sp.p[idx] : -1;
+    m.setStyle({ fillColor: v < 0 ? '#33384a' : animColor(v), fillOpacity: v < 0 ? .35 : .9 });
+  }
+}
+function animStep() { animFrame((animIdx + 1) % sparkData.periodos.length); }
+function animPlay() {
+  if (animTimer) return;
+  document.getElementById('anim-play').textContent = '❚❚';
+  animTimer = setInterval(animStep, 750);
+}
+function animPause() {
+  clearInterval(animTimer); animTimer = null;
+  const b = document.getElementById('anim-play'); if (b) b.textContent = '▶';
+}
+function animStart() {
+  if (!sparkData) { alert('Datos de evolución aún cargando, probá en un segundo.'); return; }
+  animActive = true;
+  animCtrl.addTo(map);
+  const sl = document.getElementById('anim-slider');
+  sl.max = sparkData.periodos.length - 1;
+  sl.oninput = e => { animPause(); animFrame(+e.target.value); };
+  document.getElementById('anim-play').onclick = () => animTimer ? animPause() : animPlay();
+  document.getElementById('anim-close').onclick = animStop;
+  document.getElementById('btn-anim').textContent = '■ Detener animación';
+  animFrame(0);
+  animPlay();
+}
+function animStop() {
+  animPause();
+  animActive = false;
+  map.removeControl(animCtrl);
+  document.getElementById('btn-anim').textContent = '▶ Animar últimos 24 meses';
+  applyFilters(); // restaura el coloreo por métrica
+}
+document.getElementById('btn-anim').addEventListener('click', () => animActive ? animStop() : animStart());
+
+// ── Selector de año ────────────────────────────────────────────────────────
+document.getElementById('f-year').addEventListener('change', function() {
+  const yr = this.value;
+  document.querySelectorAll('.t-year').forEach(e => e.textContent = yr);
+  document.getElementById('loading').style.display = 'flex';
+  // Remove previous year script if any
+  const old = document.getElementById('pozos-year-script');
+  if (old) old.remove();
+  const s = document.createElement('script');
+  s.id = 'pozos-year-script';
+  s.src = `data/pozos_${yr}.js`;
+  s.onload = () => {
+    document.getElementById('loading').style.display = 'none';
+    // Re-populate selects (clear first)
+    ['f-cuenca','f-prov','f-emp','f-tipo'].forEach(id => {
+      const el = document.getElementById(id);
+      while (el.options.length > 1) el.remove(1);
+    });
+    populateFilters();
+    applyFilters();
+  };
+  document.head.appendChild(s);
+});
+
+// ── Popup con sparklines ──────────────────────────────────────────────────
+function pozoPopupHTML(r) {
+  const sigla = r[I.sigla];
+  let sparkHtml = '';
+  if (sparkData) {
+    const sp = sparkData.pozos[sigla];
+    if (sp) {
+      const per = sparkData.periodos;
+      const ultPet = sp.p[sp.p.length-1];
+      const ultGas = sp.g[sp.g.length-1] / 1000;
+      sparkHtml = `
+        <div class="spark-label" style="margin-top:8px">Petróleo m³/mes · últimos 24 meses <span style="color:#8794a8">(último: ${fmtNum(ultPet)})</span></div>
+        ${monthlyBarsSVG(sp.p, '#e07020', per, 'm³')}
+        <div class="spark-label" style="margin-top:6px">Gas Mm³/mes <span style="color:#8794a8">(último: ${fmtNum(Math.round(ultGas))})</span></div>
+        ${monthlyBarsSVG(sp.g.map(v=>v/1000), '#4db6f0', per, 'Mm³')}`;
+    }
+  }
+  return `
+    <div class="lf-popup-empresa">${r[I.emp] || '—'}</div>
+    <div class="lf-popup-grid">
+      <span class="k">Sigla</span>      <span class="v">${sigla}</span>
+      <span class="k">Cuenca</span>     <span class="v">${r[I.cu] || '—'}</span>
+      <span class="k">Provincia</span>  <span class="v">${r[I.prov] || '—'}</span>
+      <span class="k">Formación</span>  <span class="v">${r[I.form] || '—'}</span>
+      <span class="k">Petróleo m³</span><span class="v">${fmtNum(r[I.pet])}</span>
+      <span class="k">Gas Mm³</span>    <span class="v">${fmtNum(r[I.gas])}</span>
+      <span class="k">Agua m³</span>    <span class="v">${fmtNum(r[I.agua])}</span>
+      <span class="k">GOR m³/m³</span> <span class="v">${r[I.pet] > 0 ? fmtNum(Math.round(gorVal(r))) : '—'}</span>
+      <span class="k">Corte agua</span><span class="v">${(r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1)+'%' : '—'}</span>
+      <span class="k">Meses activo</span><span class="v">${r[I.ma]}</span>
+      <span class="k">Tipo</span>       <span class="v">${r[I.tr] || '—'}</span>
+    </div>${sparkHtml}`;
+}
+function openPopup(marker, r) {
+  marker.bindPopup(pozoPopupHTML(r), { maxWidth: 290 }).openPopup();
+}
+
+function miniSparkSVG(vals, color) {
+  const W = 260, H = 40, pad = 2;
+  const max = Math.max(...vals, 1);
+  const pts = vals.map((v, i) => {
+    const x = pad + (i / (vals.length - 1)) * (W - pad*2);
+    const y = H - pad - (v / max) * (H - pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg width="${W}" height="${H}" style="display:block;background:#1e2235;border-radius:3px">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function updateTotals(rows) {
+  let totalPet = 0, totalGas = 0;
+  const emps = new Set();
+  for (const r of rows) { totalPet += r[I.pet]; totalGas += r[I.gas]; emps.add(r[I.emp]); }
+  document.getElementById('t-pozos').textContent = rows.length.toLocaleString('es-AR');
+  document.getElementById('t-pet').textContent   = fmtM(totalPet);
+  document.getElementById('t-gas').textContent   = fmtM(totalGas / 1000);
+  document.getElementById('t-emp').textContent   = emps.size.toLocaleString('es-AR');
+}
+
+// ── Panel cuencas (sidebar mapa) ──────────────────────────────────────────
+function loadCuencasPanel() {
+  fetch('data/cuencas_stats.json').then(r => r.json()).then(data => {
+    const maxPet = Math.max(...data.map(d => d.prod_pet_total));
+    const list = document.getElementById('cuencas-list');
+    data.forEach(d => {
+      const pct = (d.prod_pet_total / maxPet * 100).toFixed(1);
+      const div = document.createElement('div');
+      div.className = 'cuenca-row';
+      div.innerHTML = `
+        <div class="cname">${d.cuenca}</div>
+        <div class="cbar-wrap"><div class="cbar" style="width:${pct}%"></div></div>
+        <div class="cstats">
+          <span>🛢 ${fmtM(d.prod_pet_total)} m³</span>
+          <span>⛽ ${fmtM(d.prod_gas_total/1000)} Mm³</span>
+          <span>${d.pozos_activos.toLocaleString('es-AR')} poz.</span>
+        </div>`;
+      div.addEventListener('click', () => {
+        const sel = document.getElementById('f-cuenca');
+        const already = sel.value === d.cuenca;
+        sel.value = already ? '' : d.cuenca;
+        document.querySelectorAll('.cuenca-row').forEach(r => r.classList.remove('active'));
+        if (!already) div.classList.add('active');
+        applyFilters();
+      });
+      list.appendChild(div);
+    });
+  });
+}
+
+// ── Gráfico nacional ──────────────────────────────────────────────────────
+let chartNac = null, chartCuenca = null, chartEmpresa = null;
+let activeMetric = 'pet';
+let activeCuencas = new Set();
+let activeEmpresas = new Set();
+let serieEmpresas = null;
+
+function buildNacionalChart() {
+  chartNac = new Chart(document.getElementById('chart-nacional'), {
+    type: 'line',
+    data: {
+      labels: serieNacional.periodos.map(p => p.slice(0,7)),
+      datasets: [
+        { label: 'Petróleo m³', data: serieNacional.pet, borderColor: '#e07020', backgroundColor: '#e0702018', borderWidth: 1.5, pointRadius: 0, fill: true, yAxisID: 'y1' },
+        { label: 'Gas Mm³',     data: serieNacional.gas.map(v=>v/1000), borderColor: '#4db6f0', backgroundColor: '#4db6f018', borderWidth: 1.5, pointRadius: 0, fill: true, yAxisID: 'y2' },
+      ]
+    },
+    options: {
+      animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { titleFont: { size: 9 }, bodyFont: { size: 9 } } },
+      scales: {
+        x:  { ticks: { maxTicksLimit: 8, font: { size: 8 } }, grid: { color: '#2a2f42' } },
+        y1: { position: 'left',  ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
+        y2: { position: 'right', ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { drawOnChartArea: false } },
+      }
+    }
+  });
+}
+
+// ── Chips cuencas (comparador multi-select) ───────────────────────────────
+function buildCuencaChips() {
+  const cuencas = Object.keys(serieCuencas).sort();
+  const wrap = document.getElementById('cuenca-chips');
+  cuencas.forEach((cu, idx) => {
+    const color = CUENCA_COLORS[idx % CUENCA_COLORS.length];
+    const chip = document.createElement('div');
+    chip.className = 'cuenca-chip';
+    chip.textContent = cu;
+    chip.dataset.cuenca = cu;
+    chip.dataset.color  = color;
+    chip.addEventListener('click', () => {
+      if (activeCuencas.has(cu)) {
+        activeCuencas.delete(cu);
+        chip.classList.remove('active');
+        chip.style.background = '';
+      } else {
+        activeCuencas.add(cu);
+        chip.classList.add('active');
+        chip.style.background = color + '55';
+        chip.style.color = color;
+        chip.style.borderColor = color;
+      }
+      updateCuencaChart();
+    });
+    wrap.appendChild(chip);
+  });
+  // Seleccionar Neuquina por defecto
+  const def = wrap.querySelector('[data-cuenca="NEUQUINA"]') || wrap.firstChild;
+  if (def) def.click();
+}
+
+function updateCuencaChart() {
+  if (chartCuenca) chartCuenca.destroy();
+  if (activeCuencas.size === 0) return;
+
+  const isGas = activeMetric === 'gas';
+  const labels = serieCuencas[[...activeCuencas][0]].periodos.map(p => p.slice(0,7));
+  const datasets = [...activeCuencas].map((cu, idx) => {
+    const d = serieCuencas[cu];
+    const chip = document.querySelector(`[data-cuenca="${cu}"]`);
+    const color = chip ? chip.dataset.color : CUENCA_COLORS[idx % CUENCA_COLORS.length];
+    const data = isGas ? d.gas.map(v => v/1000) : d.pet;
+    return { label: cu, data, borderColor: color, backgroundColor: color+'22', borderWidth: 1.5, pointRadius: 0, fill: false };
+  });
+
+  chartCuenca = new Chart(document.getElementById('chart-cuenca'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { titleFont: { size: 9 }, bodyFont: { size: 9 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 8 } }, grid: { color: '#2a2f42' } },
+        y: { ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
+      }
+    }
+  });
+}
+
+// ── Comparador de empresas (mismo patrón que cuencas) ──────────────────────
+function buildEmpresaChips() {
+  const empresas = Object.keys(serieEmpresas).sort();
+  const wrap = document.getElementById('empresa-chips');
+  empresas.forEach((emp, idx) => {
+    const color = CUENCA_COLORS[idx % CUENCA_COLORS.length];
+    const chip = document.createElement('div');
+    chip.className = 'cuenca-chip';
+    chip.textContent = emp.replace(/ S\.?A\.?U?\.?$| SAU$| S\.R\.L\.$/i, '').trim();
+    chip.title = emp;
+    chip.dataset.emp = emp;
+    chip.dataset.color = color;
+    chip.addEventListener('click', () => {
+      if (activeEmpresas.has(emp)) {
+        activeEmpresas.delete(emp);
+        chip.classList.remove('active');
+        chip.style.background = ''; chip.style.color = ''; chip.style.borderColor = '';
+      } else {
+        activeEmpresas.add(emp);
+        chip.classList.add('active');
+        chip.style.background = color + '55'; chip.style.color = color; chip.style.borderColor = color;
+      }
+      updateEmpresaChart();
+    });
+    wrap.appendChild(chip);
+  });
+  const def = wrap.querySelector('[data-emp="YPF S.A."]') || wrap.firstChild;
+  if (def) def.click();
+}
+
+function updateEmpresaChart() {
+  if (chartEmpresa) chartEmpresa.destroy();
+  if (activeEmpresas.size === 0) return;
+  const isGas = activeMetric === 'gas';
+  const first = serieEmpresas[[...activeEmpresas][0]];
+  const labels = first.periodos.map(p => p.slice(0, 7));
+  const datasets = [...activeEmpresas].map((emp, idx) => {
+    const d = serieEmpresas[emp];
+    const chip = document.querySelector(`[data-emp="${CSS.escape(emp)}"]`);
+    const color = chip ? chip.dataset.color : CUENCA_COLORS[idx % CUENCA_COLORS.length];
+    const data = isGas ? d.gas.map(v => v / 1000) : d.pet;
+    return { label: emp, data, borderColor: color, backgroundColor: color + '22', borderWidth: 1.5, pointRadius: 0, fill: false };
+  });
+  chartEmpresa = new Chart(document.getElementById('chart-empresa'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { titleFont: { size: 9 }, bodyFont: { size: 9 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 8 } }, grid: { color: '#2a2f42' } },
+        y: { ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
+      }
+    }
+  });
+}
+
+// ── Botones métrica (afectan cuencas y empresas) ───────────────────────────
+document.querySelectorAll('.metric-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeMetric = btn.dataset.metric;
+    updateCuencaChart();
+    updateEmpresaChart();
+  });
+});
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'tendencia' && chartNac) {
+      setTimeout(() => { chartNac.resize(); if (chartCuenca) chartCuenca.resize(); if (chartEmpresa) chartEmpresa.resize(); }, 50);
+    }
+  });
+});
+
+// ── Eventos filtros ───────────────────────────────────────────────────────
+['f-cuenca','f-prov','f-emp','f-tipo'].forEach(id =>
+  document.getElementById(id).addEventListener('change', applyFilters));
+document.getElementById('f-minpet').addEventListener('input', function() {
+  document.getElementById('f-minpet-val').textContent = (+this.value).toLocaleString('es-AR');
+  applyFilters();
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  ['f-cuenca','f-prov','f-emp','f-tipo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-minpet').value = 0;
+  document.getElementById('f-minpet-val').textContent = '0';
+  document.querySelectorAll('.cuenca-row').forEach(r => r.classList.remove('active'));
+  if (noConvMode) document.getElementById('btn-noconv').click();
+  applyFilters();
+});
+
+// ── Ranking ───────────────────────────────────────────────────────────────
+let rankingData = null;
+let activeRank  = 'top_productores';
+
+fetch('data/ranking.json').then(r => r.json()).then(d => {
+  rankingData = d;
+  renderRanking(activeRank);
+});
+
+document.querySelectorAll('.rank-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeRank = btn.dataset.rank;
+    renderRanking(activeRank);
+  });
+});
+
+function renderRanking(key) {
+  if (!rankingData) return;
+  const list = document.getElementById('ranking-list');
+  list.innerHTML = '';
+  rankingData[key].forEach((r, i) => {
+    const isTop = key === 'top_productores';
+    const isUp  = key === 'top_crecimiento';
+    const val   = isTop
+      ? `${fmtM(r.pet25)} m³`
+      : `${r.dpct > 0 ? '+' : ''}${r.dpct.toFixed(0)}%`;
+    const cls   = isTop ? 'val-neu' : (isUp ? 'val-up' : 'val-down');
+    const row = document.createElement('div');
+    row.className = 'rank-row';
+    row.innerHTML = `
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-info">
+        <div class="rname">${r.sigla}</div>
+        <div class="remp">${r.empresa} · ${r.cuenca}</div>
+      </div>
+      <div class="rank-val ${cls}">${val}</div>`;
+    row.addEventListener('click', () => flyToPozo(r.sigla));
+    list.appendChild(row);
+  });
+}
+
+function flyToPozo(sigla) {
+  const row = window.POZOS.find(r => r[I.sigla].trim() === sigla.trim());
+  if (!row) return;
+  document.querySelector('[data-tab="filtros"]').click();
+  const ll = [row[I.lat], row[I.lon]];
+  map.invalidateSize();
+  try { map.flyTo(ll, 14, { duration: 1.2 }); } catch (e) { map.setView(ll, 14); }
+  L.popup({ maxWidth: 290 }).setLatLng(ll).setContent(pozoPopupHTML(row)).openOn(map);
+}
+
+// ── Buscador de pozo por sigla ──────────────────────────────────────────────
+const searchInput = document.getElementById('f-search');
+const searchResults = document.getElementById('search-results');
+searchInput.addEventListener('input', function () {
+  const q = this.value.trim().toUpperCase();
+  if (q.length < 2) { searchResults.classList.remove('show'); return; }
+  const hits = [];
+  for (const r of window.POZOS) {
+    if (r[I.sigla].toUpperCase().includes(q)) { hits.push(r); if (hits.length >= 8) break; }
+  }
+  if (!hits.length) {
+    searchResults.innerHTML = '<div class="sr-empty">Sin resultados</div>';
+  } else {
+    searchResults.innerHTML = hits.map(r =>
+      `<div class="sr-item" data-sig="${r[I.sigla].replace(/"/g,'&quot;')}">
+        <div class="sr-sig">${r[I.sigla]}</div>
+        <div class="sr-sub">${r[I.emp] || '—'} · ${r[I.cu] || '—'}</div>
+      </div>`).join('');
+  }
+  searchResults.classList.add('show');
+});
+searchResults.addEventListener('click', e => {
+  const item = e.target.closest('.sr-item');
+  if (!item) return;
+  flyToPozo(item.dataset.sig);
+  searchResults.classList.remove('show');
+  searchInput.value = item.dataset.sig;
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#f-search') && !e.target.closest('#search-results'))
+    searchResults.classList.remove('show');
+});
+
+// ── Exportar vista filtrada a CSV ───────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const rows = lastFiltered;
+  if (!rows.length) { alert('No hay pozos en la vista actual.'); return; }
+  const head = ['sigla','empresa','cuenca','provincia','formacion','tipo',
+    'lat','lon','pet_m3','gas_Mm3','agua_m3','gor_m3m3','corte_agua_pct','meses_activo'];
+  const esc = v => { v = (v == null ? '' : String(v)); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const lines = [head.join(',')];
+  for (const r of rows) {
+    lines.push([
+      r[I.sigla], r[I.emp], r[I.cu], r[I.prov], r[I.form], r[I.tr],
+      r[I.lat], r[I.lon], r[I.pet], r[I.gas], r[I.agua],
+      r[I.pet] > 0 ? Math.round(gorVal(r)) : '', (r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1) : '', r[I.ma]
+    ].map(esc).join(','));
+  }
+  const yr = document.getElementById('f-year').value;
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pozos_${yr}_${rows.length}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Curva de declino (en popup) ───────────────────────────────────────────
+// Ajuste exponencial: ln(q) = ln(q0) - D*t  →  regresión lineal
+function fitDecline(vals) {
+  const pts = [];
+  vals.forEach((v, t) => { if (v > 0) pts.push([t, Math.log(v)]); });
+  if (pts.length < 4) return null;
+  const n = pts.length;
+  const sx = pts.reduce((s, p) => s + p[0], 0);
+  const sy = pts.reduce((s, p) => s + p[1], 0);
+  const sxy = pts.reduce((s, p) => s + p[0]*p[1], 0);
+  const sxx = pts.reduce((s, p) => s + p[0]*p[0], 0);
+  const D  = -(n*sxy - sx*sy) / (n*sxx - sx*sx);  // tasa de declino mensual
+  const q0 = Math.exp((sy + D*sx) / n);
+  return { D, q0 };
+}
+
+// ── Barras de producción mensual (en popup) ───────────────────────────────
+function monthlyBarsSVG(vals, color, periodos, unidad) {
+  const W = 270, H = 62, padL = 2, padR = 2, padT = 4, axisH = 12;
+  const plotH = H - axisH - padT;
+  const n = vals.length;
+  const maxVal = Math.max(...vals, 1);
+  const gap = 1;
+  const bw = (W - padL - padR) / n - gap;
+  let bars = '';
+  for (let i = 0; i < n; i++) {
+    const v = vals[i];
+    const h = v > 0 ? Math.max(1, (v / maxVal) * plotH) : 0;
+    const x = padL + i * ((W - padL - padR) / n);
+    const y = padT + plotH - h;
+    const per = periodos && periodos[i] ? periodos[i].slice(0,7) : '';
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${color}" opacity="${v>0?0.9:0.2}"><title>${per}: ${fmtNum(v)} ${unidad}</title></rect>`;
+  }
+  // Etiquetas de meses: primero, medio y último
+  let ticks = '';
+  if (periodos && periodos.length) {
+    const idxs = [0, Math.floor(n/2), n-1];
+    idxs.forEach(i => {
+      const x = padL + i * ((W - padL - padR) / n) + bw/2;
+      const anchor = i === 0 ? 'start' : (i === n-1 ? 'end' : 'middle');
+      ticks += `<text x="${x.toFixed(1)}" y="${H-2}" text-anchor="${anchor}" font-size="8" fill="#7080a0">${periodos[i].slice(0,7)}</text>`;
+    });
+  }
+  return `<svg width="${W}" height="${H}" style="display:block;background:#1e2235;border-radius:3px">
+    ${bars}
+    ${ticks}
+  </svg>`;
+}
+
+function declineSVG(vals, color) {
+  const W = 260, H = 50, pad = 3;
+  const maxVal = Math.max(...vals, 1);
+  const fit = fitDecline(vals);
+
+  // Puntos reales
+  const realPts = vals.map((v, i) => {
+    const x = pad + (i / (vals.length - 1)) * (W - pad*2);
+    const y = H - pad - (v / maxVal) * (H - pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  let curveSvg = '';
+  let proyInfo = '';
+  if (fit && fit.D > 0) {
+    // Proyectar 12 meses más allá
+    const total = vals.length + 12;
+    const pts = [];
+    for (let t = 0; t < total; t++) {
+      const q = fit.q0 * Math.exp(-fit.D * t);
+      if (q < 0.01) break;
+      const x = pad + (t / (vals.length - 1)) * (W - pad*2);
+      const y = H - pad - (q / maxVal) * (H - pad*2);
+      pts.push(`${Math.min(x, W+20).toFixed(1)},${Math.max(y, -5).toFixed(1)}`);
+    }
+    curveSvg = `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>`;
+    // Meses hasta llegar al 20% del pico
+    const mesesDecl = fit.D > 0 ? Math.round(Math.log(0.2) / -fit.D) : null;
+    if (mesesDecl && mesesDecl > 0 && mesesDecl < 500) {
+      proyInfo = `<text x="${W-2}" y="${H-1}" text-anchor="end" font-size="8" fill="#7080a0">declino al 20%: ~${mesesDecl} meses</text>`;
+    }
+  }
+
+  return `<svg width="${W}" height="${H}" style="display:block;background:#1e2235;border-radius:3px;overflow:visible">
+    ${curveSvg}
+    <polyline points="${realPts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
+    ${proyInfo}
+  </svg>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function fmtNum(n) { return (n||0).toLocaleString('es-AR', { maximumFractionDigits: 0 }); }
+function fmtM(n) {
+  if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (Math.abs(n) >= 1e3) return (n/1e3).toFixed(1)+'k';
+  return (+n).toFixed(0);
+}
+
+// ── Init (al final, cuando ya están definidas todas las funciones y vars) ───
+populateFilters();
+loadCuencasPanel();
+applyFilters();
+document.getElementById('loading').style.display = 'none';
+</script>
+</body>
+</html>
