@@ -8,15 +8,16 @@ Incluye coords y metadata para mostrar en la tabla.
 import json
 import pandas as pd
 
-COLS = ["sigla", "anio", "mes", "prod_pet", "prod_gas", "empresa", "cuenca", "provincia", "tipo_de_recurso"]
+COLS = ["idpozo", "sigla", "anio", "mes", "prod_pet", "prod_gas", "empresa", "cuenca", "provincia", "tipo_de_recurso"]
 
 print("Cargando 2024 y 2025...")
 df24 = pd.read_csv("data/produccion-2024.csv", usecols=COLS, encoding="utf-8-sig", low_memory=False)
 df25 = pd.read_csv("data/produccion-2025.csv", usecols=COLS, encoding="utf-8-sig", low_memory=False)
 
-# Agregar por pozo y año
+# Agregar por pozo y año (clave idpozo: la sigla no es única en el padrón)
 def agg_year(df):
-    return df.groupby("sigla").agg(
+    return df.groupby("idpozo").agg(
+        sigla=("sigla", "first"),
         pet=("prod_pet", "sum"),
         gas=("prod_gas", "sum"),
         empresa=("empresa", "first"),
@@ -30,7 +31,7 @@ agg24 = agg_year(df24).rename(columns={"pet":"pet24","gas":"gas24","meses":"m24"
 agg25 = agg_year(df25).rename(columns={"pet":"pet25","gas":"gas25","meses":"m25"})
 
 # Join
-m = agg24.merge(agg25[["sigla","pet25","gas25","m25"]], on="sigla", how="inner")
+m = agg24.merge(agg25[["idpozo","pet25","gas25","m25"]], on="idpozo", how="inner")
 m = m[(m.pet24 > 500) & (m.pet25 > 500)]  # filtrar pozos con producción relevante
 
 m["delta_abs"] = m.pet25 - m.pet24
@@ -42,9 +43,10 @@ m["pet25_m"] = (m.pet25 / m.m25).round(0).astype(int)
 m["delta_pct_norm"] = ((m.pet25_m - m.pet24_m) / m.pet24_m * 100).round(1)
 
 def to_records(df, n=20):
-    return df.head(n)[["sigla","empresa","cuenca","provincia","tipo",
+    return df.head(n)[["idpozo","sigla","empresa","cuenca","provincia","tipo",
                          "pet24","pet25","delta_abs","delta_pct_norm"]].rename(
-        columns={"delta_pct_norm":"dpct"}).assign(
+        columns={"delta_pct_norm":"dpct", "idpozo":"id"}).assign(
+        sigla=lambda x: x.sigla.str.strip(),
         pet24=lambda x: x.pet24.round(0).astype(int),
         pet25=lambda x: x.pet25.round(0).astype(int),
         delta_abs=lambda x: x.delta_abs.round(0).astype(int),

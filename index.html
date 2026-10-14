@@ -204,6 +204,25 @@
   .val-down { color: var(--down); }
   .val-neu  { color: var(--accent); }
 
+  /* ── Geo ── */
+  #tab-geo { padding: 16px; gap: 10px; }
+  #tab-geo .section-title { margin: 6px 0 2px; }
+  .geo-note { font-size: 12px; color: var(--text-mute); line-height: 1.5; }
+  .band-row { display: grid; grid-template-columns: 78px 1fr 62px; gap: 8px; align-items: center; font-size: 13px; color: var(--text-dim); margin: 3px 0; }
+  .band-bar { height: 9px; border-radius: 3px; background: var(--panel-2); position: relative; }
+  .band-bar div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+  .band-row .pct { text-align: right; color: var(--text-mute); font-size: 12px; }
+  .geo-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .geo-table th { text-align: right; color: var(--text-mute); font-weight: 600; padding: 5px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .geo-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #232838; color: var(--text-dim); white-space: nowrap; }
+  .geo-table th:first-child, .geo-table td:first-child { text-align: left; white-space: normal; }
+  .geo-table td.hi { color: var(--accent); font-weight: 700; }
+  .qa-row { padding: 9px 6px; border-bottom: 1px solid #232838; cursor: pointer; font-size: 13px; }
+  .qa-row:hover { background: var(--panel-2); }
+  .qa-row .s { font-weight: 600; color: var(--text-dim); }
+  .qa-row .d { color: var(--text-mute); font-size: 12px; }
+  .warn { color: #c0392b; font-weight: 700; }
+
   /* ── Botón en popup ── */
   .popup-btn {
     width: 100%; padding: 9px; margin-top: 2px; background: #103a5f; color: #cfe8fb;
@@ -277,6 +296,7 @@
     <button class="tab-btn active" data-tab="filtros">Mapa</button>
     <button class="tab-btn" data-tab="tendencia">Tendencia</button>
     <button class="tab-btn" data-tab="ranking">Ranking</button>
+    <button class="tab-btn" data-tab="geo">Geo</button>
   </div>
 
   <div id="tab-filtros" class="tab-pane active">
@@ -364,6 +384,29 @@
     </div>
     <div id="ranking-list"></div>
   </div>
+
+  <div id="tab-geo" class="tab-pane">
+    <div class="geo-note">Cruces espaciales con capas de la Sec. Energía (cuencas, gasoductos troncales, refinerías,
+      yacimientos, permisos) y datos de fractura. Las capas se prenden en el control del mapa.</div>
+
+    <div class="section-title">Distancia al gasoducto troncal más cercano</div>
+    <div class="geo-note" id="band-note"></div>
+    <div id="band-list"></div>
+
+    <div class="section-title">Fractura en Vaca Muerta · diseño por año</div>
+    <div class="chart-wrap"><canvas id="chart-frac" height="170"></canvas></div>
+    <div class="geo-note">Mediana de pozos horizontales por año de fin de fractura. Barras: m³ equivalentes de
+      petróleo en los 12 meses siguientes por km de rama (gas convertido 6:1). Solo años con la ventana completa.</div>
+
+    <div class="section-title">Productividad por operador (VM)</div>
+    <table class="geo-table" id="frac-emp"></table>
+    <div class="geo-note">m³eq/km = producción de 12 meses por km de rama (mediana). Los pozos de la ventana de gas y los de
+      petróleo están en distinta geología: compará operadores con un % de gas parecido.</div>
+
+    <div class="section-title">Control de calidad · cuenca declarada vs. polígono</div>
+    <div class="geo-note" id="qa-note"></div>
+    <div id="qa-list"></div>
+  </div>
 </div>
 
 <div id="map"></div>
@@ -374,7 +417,8 @@
 <script id="pozos-year-script" src="data/pozos_2024.js"></script>
 <script>
 // ── Constantes ────────────────────────────────────────────────────────────
-const I = { lat:0, lon:1, pet:2, gas:3, agua:4, emp:5, cu:6, prov:7, tr:8, form:9, ma:10, est:11, sigla:12 };
+// id = idpozo: la sigla NO es única en el padrón (hay pozos distintos con la misma sigla)
+const I = { lat:0, lon:1, pet:2, gas:3, agua:4, emp:5, cu:6, prov:7, tr:8, form:9, ma:10, est:11, sigla:12, id:13 };
 
 // Paleta para cuencas en el comparador (hasta 8)
 const CUENCA_COLORS = ['#4db6f0','#e07020','#50e080','#f0c040','#e050b0','#a070f0','#50c0c0','#f08080'];
@@ -420,6 +464,7 @@ const areasLayer = L.geoJSON(null, {
         <span class="k">Petróleo m³</span><span class="v">${(p.pet||0).toLocaleString('es-AR')}</span>
         <span class="k">Gas Mm³</span>   <span class="v">${Math.round((p.gas||0)/1000).toLocaleString('es-AR')}</span>
         <span class="k">Provincia</span> <span class="v">${p.prov_pozos || '—'}</span>
+        ${p.km_oleo != null ? `<span class="k">Ductos (km)</span><span class="v">🛢 ${fmtNum(p.km_oleo)} · ⛽ ${fmtNum(p.km_gas)} · 💧 ${fmtNum(p.km_agua)}</span>` : ''}
         <span class="k">Actualizado</span><span class="v">${p.mod || '—'}</span>
       </div>${p.socios ? `<div class="spark-label" style="margin-top:6px">Participación</div><div style="font-size:12px;color:#5a6b7e;margin-bottom:8px">${p.socios}</div>` : ''}
       <button class="popup-btn" onclick="filterByArea(${f._idx})">📍 Ver solo los pozos de esta área</button>`,
@@ -468,9 +513,58 @@ function clearAreaFilter() {
   applyFilters();
 }
 
+// ── Capas geo (preprocess_geo.py): se descargan recién al prenderlas ───────
+function lazyGeo(url, opts) {
+  const lyr = L.geoJSON(null, opts);
+  let loaded = false;
+  lyr.on('add', () => {
+    if (loaded) return;
+    loaded = true;
+    fetch(url).then(r => r.json()).then(d => lyr.addData(d)).catch(() => { loaded = false; });
+  });
+  return lyr;
+}
+const popupGrid = rows => `<div class="lf-popup-grid">${rows.filter(r => r[1] != null && r[1] !== '')
+  .map(([k, v]) => `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}</div>`;
+
+const cuencasLayer = lazyGeo('data/cuencas.geojson', {
+  style: f => ({ color: f.properties.tipo === 'Productiva' ? '#f0a000' : '#7d8aa8', weight: 1.5,
+                 dashArray: f.properties.tipo === 'Productiva' ? null : '4 4',
+                 fillColor: f.properties.tipo === 'Productiva' ? '#f0a000' : '#7d8aa8', fillOpacity: 0.06 }),
+  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(
+    `<div class="lf-popup-empresa">Cuenca ${p.cuenca}</div>` + popupGrid([
+      ['Tipo', p.tipo], ['Ubicación', p.ubicacion], ['Superficie', fmtNum(p.km2) + ' km²'],
+      ['Pozos con prod.', p.n_pozos ? fmtNum(p.n_pozos) : null],
+      ['Petróleo 2025', p.pet ? fmtM(p.pet) + ' m³' : null], ['Gas 2025', p.gas ? fmtM(p.gas / 1000) + ' MMm³' : null]])); },
+});
+const gasodLayer = lazyGeo('data/gasoductos.geojson', {
+  style: f => ({ color: '#4dd0e1', weight: f.properties.subtipo === 'Troncal' ? 2.5 : 1.5, opacity: 0.85 }),
+  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(
+    `<div class="lf-popup-empresa">${p.nombre}</div>` + popupGrid([['Tramo', p.tramo], ['Tipo', p.subtipo], ['Empresa', p.empresa]])); },
+});
+const refiLayer = lazyGeo('data/refinerias.geojson', {
+  pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 8, color: '#fff', weight: 2, fillColor: '#e53935', fillOpacity: 1 }),
+  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(
+    `<div class="lf-popup-empresa">🏭 Refinería ${p.planta}</div>` + popupGrid([['Empresa', p.empresa], ['Provincia', p.provincia]])); },
+});
+const yacLayer = lazyGeo('data/yacimientos.geojson', {
+  style: { color: '#9ccc65', weight: 1, fillColor: '#9ccc65', fillOpacity: 0.07 },
+  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(
+    `<div class="lf-popup-empresa">Yacimiento ${p.nombre}</div>` + popupGrid([['Operador', p.operador]])); },
+});
+const permLayer = lazyGeo('data/permisos.geojson', {
+  style: { color: '#ff8a65', weight: 1.5, dashArray: '6 4', fillColor: '#ff8a65', fillOpacity: 0.08 },
+  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(
+    `<div class="lf-popup-empresa">Permiso de exploración ${p.nombre}</div>` + popupGrid([
+      ['Operador', p.operador], ['Pozos con prod.', p.n_pozos ? fmtNum(p.n_pozos) : null],
+      ['Petróleo 2025', p.pet ? fmtNum(p.pet) + ' m³' : null]]) +
+    (p.socios ? `<div style="font-size:12px;color:#5a6b7e">${p.socios}</div>` : '')); },
+});
+
 L.control.layers(
   { 'Oscuro': baseDark, 'Satélite': baseSat },
-  { 'Áreas concesión': areasLayer },
+  { 'Áreas concesión': areasLayer, 'Cuencas sedimentarias': cuencasLayer, 'Yacimientos': yacLayer,
+    'Permisos de exploración': permLayer, 'Gasoductos troncales': gasodLayer, 'Refinerías': refiLayer },
   { position: 'topright', collapsed: false }
 ).addTo(map);
 
@@ -638,7 +732,7 @@ function buildMarkers(rows) {
       radius: markerRadius(r),
       fillColor: prodColor(r), color: '#0003', weight: .5, fillOpacity: .85
     });
-    m._sigla = r[I.sigla];
+    m._id = r[I.id];
     m.on('click', () => openPopup(m, r));
     return m;
   });
@@ -696,7 +790,7 @@ function animFrame(idx) {
   document.getElementById('anim-period').textContent = per;
   document.getElementById('anim-slider').value = idx;
   for (const m of currentMarkers) {
-    const sp = sparkData.pozos[m._sigla];
+    const sp = sparkData.pozos[m._id];
     const v = sp ? sp.p[idx] : -1;
     m.setStyle({ fillColor: v < 0 ? '#33384a' : animColor(v), fillOpacity: v < 0 ? .35 : .9 });
   }
@@ -759,10 +853,10 @@ document.getElementById('f-year').addEventListener('change', function() {
 
 // ── Popup con sparklines ──────────────────────────────────────────────────
 function pozoPopupHTML(r) {
-  const sigla = r[I.sigla];
+  const sigla = r[I.sigla], id = r[I.id];
   let sparkHtml = '';
   if (sparkData) {
-    const sp = sparkData.pozos[sigla];
+    const sp = sparkData.pozos[id];
     if (sp) {
       const per = sparkData.periodos;
       const ultPet = sp.p[sp.p.length-1];
@@ -788,7 +882,7 @@ function pozoPopupHTML(r) {
       <span class="k">Corte agua</span><span class="v">${(r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1)+'%' : '—'}</span>
       <span class="k">Meses activo</span><span class="v">${r[I.ma]}</span>
       <span class="k">Tipo</span>       <span class="v">${r[I.tr] || '—'}</span>
-    </div>${sparkHtml}`;
+    </div>${geoPopupHTML(id, r[I.cu])}${fracPopupHTML(id)}${sparkHtml}`;
 }
 function openPopup(marker, r) {
   marker.bindPopup(pozoPopupHTML(r), { maxWidth: 290 }).openPopup();
@@ -1011,6 +1105,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'geo') buildGeoTab();
     if (btn.dataset.tab === 'tendencia' && chartNac) {
       setTimeout(() => { chartNac.resize(); if (chartCuenca) chartCuenca.resize(); if (chartEmpresa) chartEmpresa.resize(); }, 50);
     }
@@ -1071,13 +1166,13 @@ function renderRanking(key) {
         <div class="remp">${r.empresa} · ${r.cuenca}</div>
       </div>
       <div class="rank-val ${cls}">${val}</div>`;
-    row.addEventListener('click', () => flyToPozo(r.sigla));
+    row.addEventListener('click', () => flyToPozo(r.id));
     list.appendChild(row);
   });
 }
 
-function flyToPozo(sigla) {
-  const row = window.POZOS.find(r => r[I.sigla].trim() === sigla.trim());
+function flyToPozo(id) {
+  const row = window.POZOS.find(r => r[I.id] === +id);
   if (!row) return;
   document.querySelector('[data-tab="filtros"]').click();
   const ll = [row[I.lat], row[I.lon]];
@@ -1100,7 +1195,7 @@ searchInput.addEventListener('input', function () {
     searchResults.innerHTML = '<div class="sr-empty">Sin resultados</div>';
   } else {
     searchResults.innerHTML = hits.map(r =>
-      `<div class="sr-item" data-sig="${r[I.sigla].replace(/"/g,'&quot;')}">
+      `<div class="sr-item" data-id="${r[I.id]}">
         <div class="sr-sig">${r[I.sigla]}</div>
         <div class="sr-sub">${r[I.emp] || '—'} · ${r[I.cu] || '—'}</div>
       </div>`).join('');
@@ -1110,9 +1205,9 @@ searchInput.addEventListener('input', function () {
 searchResults.addEventListener('click', e => {
   const item = e.target.closest('.sr-item');
   if (!item) return;
-  flyToPozo(item.dataset.sig);
+  flyToPozo(item.dataset.id);
   searchResults.classList.remove('show');
-  searchInput.value = item.dataset.sig;
+  searchInput.value = item.querySelector('.sr-sig').textContent;
 });
 document.addEventListener('click', e => {
   if (!e.target.closest('#f-search') && !e.target.closest('#search-results'))
@@ -1123,13 +1218,13 @@ document.addEventListener('click', e => {
 document.getElementById('btn-export').addEventListener('click', () => {
   const rows = lastFiltered;
   if (!rows.length) { alert('No hay pozos en la vista actual.'); return; }
-  const head = ['sigla','empresa','cuenca','provincia','formacion','tipo',
+  const head = ['idpozo','sigla','empresa','cuenca','provincia','formacion','tipo',
     'lat','lon','pet_m3','gas_Mm3','agua_m3','gor_m3m3','corte_agua_pct','meses_activo'];
   const esc = v => { v = (v == null ? '' : String(v)); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
   const lines = [head.join(',')];
   for (const r of rows) {
     lines.push([
-      r[I.sigla], r[I.emp], r[I.cu], r[I.prov], r[I.form], r[I.tr],
+      r[I.id], r[I.sigla], r[I.emp], r[I.cu], r[I.prov], r[I.form], r[I.tr],
       r[I.lat], r[I.lon], r[I.pet], r[I.gas], r[I.agua],
       r[I.pet] > 0 ? Math.round(gorVal(r)) : '', (r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1) : '', r[I.ma]
     ].map(esc).join(','));
@@ -1230,6 +1325,109 @@ function declineSVG(vals, color) {
     <polyline points="${realPts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
     ${proyInfo}
   </svg>`;
+}
+
+// ── Geo: atributos espaciales y fractura por pozo ──────────────────────────
+let pozosGeo = null, fracData = null;
+fetch('data/pozos_geo.json').then(r => r.json()).then(d => { pozosGeo = d; }).catch(() => {});
+fetch('data/fractura.json').then(r => r.json()).then(d => { fracData = d; }).catch(() => {});
+
+const CUENCA_ALIAS = { 'AUSTRAL': 'AUSTRAL MARINA', 'LOS BOLSONES': 'BOLSONES INTERMONTANOS', 'GENERAL LEVALLE': 'LEVALLE' };
+function geoPopupHTML(id, cuDecl) {
+  const g = pozosGeo && pozosGeo.pozos[id];
+  if (!g) return '';
+  const t = pozosGeo.tablas, name = (tab, i) => i >= 0 ? t[tab][i] : null;
+  const cu = name('cuenca', g[0]);
+  const decl = CUENCA_ALIAS[cuDecl] || cuDecl;
+  const cuTxt = cu === decl ? cu : `<span class="warn" title="Distinta a la declarada (${cuDecl})">⚠ ${cu || 'fuera de cuencas'}</span>`;
+  return `<div class="spark-label" style="margin-top:2px">Ubicación (cruce espacial)</div>` + popupGrid([
+    ['Cuenca (polígono)', cuTxt], ['Yacimiento', name('yacimiento', g[1])],
+    ['Permiso explor.', name('permiso', g[2])],
+    ['Gasoducto troncal', `${g[5].toLocaleString('es-AR')} km`],
+    ['Refinería', `${name('refineria', g[6])} · ${fmtNum(g[7])} km`]]);
+}
+function fracPopupHTML(id) {
+  const f = fracData && fracData.pozos[id];
+  if (!f) return '';
+  const [etapas, arena, agua, rama, fin, pet12, gas12] = f;
+  return `<div class="spark-label">Fractura (Adjunto IV)${fin ? ' · ' + fin : ''}</div>` + popupGrid([
+    ['Etapas', etapas ? fmtNum(etapas) : null], ['Rama horizontal', rama ? fmtNum(rama) + ' m' : null],
+    ['Arena', arena ? fmtNum(arena) + ' tn' : null], ['Agua', agua ? fmtNum(agua) + ' m³' : null],
+    ['Pet. 12 meses', pet12 != null ? fmtNum(pet12) + ' m³' : null],
+    ['Gas 12 meses', gas12 != null ? fmtNum(gas12) + ' Mm³' : null]]);
+}
+
+// Ir a un pozo aunque no esté en el año seleccionado
+function flyToLatLon(id, sigla, lat, lon) {
+  if (window.POZOS.some(r => r[I.id] === id)) return flyToPozo(id);
+  document.querySelector('[data-tab="filtros"]').click();
+  map.invalidateSize();
+  try { map.flyTo([lat, lon], 13, { duration: 1.2 }); } catch (e) { map.setView([lat, lon], 13); }
+  L.popup({ maxWidth: 290 }).setLatLng([lat, lon])
+    .setContent(`<div class="lf-popup-empresa">${sigla}</div><div class="spark-label">Sin producción en ${document.getElementById('f-year').value}</div>`)
+    .openOn(map);
+}
+
+let geoBuilt = false, chartFrac = null;
+function buildGeoTab() {
+  if (geoBuilt) { if (chartFrac) setTimeout(() => chartFrac.resize(), 50); return; }
+  geoBuilt = true;
+  fetch('data/geo_qa.json').then(r => r.json()).then(q => {
+    const totPet = q.dist_gasoducto.reduce((a, b) => a + b.pet, 0);
+    const totGas = q.dist_gasoducto.reduce((a, b) => a + b.gas, 0);
+    document.getElementById('band-note').textContent =
+      `Producción ${q.anio_stats} según la distancia del pozo al troncal: petróleo (naranja) y gas (celeste).`;
+    document.getElementById('band-list').innerHTML = q.dist_gasoducto.map(b => {
+      const pp = 100 * b.pet / totPet, pg = 100 * b.gas / totGas;
+      return `<div class="band-row"><span>${b.hasta ? `${b.desde}–${b.hasta} km` : `> ${b.desde} km`}</span>
+        <div><div class="band-bar"><div style="width:${pp}%;background:#e07020"></div></div>
+             <div class="band-bar" style="margin-top:3px"><div style="width:${pg}%;background:#4db6f0"></div></div></div>
+        <span class="pct">${pp.toFixed(0)}% · ${pg.toFixed(0)}%</span></div>`;
+    }).join('');
+    document.getElementById('qa-note').textContent =
+      `${q.cuenca_distinta.length} de ${q.n_pozos.toLocaleString('es-AR')} pozos tienen una cuenca declarada que no coincide ` +
+      `con el polígono que los contiene (entre paréntesis, distancia al polígono declarado). Clic para ir al pozo.`;
+    const list = document.getElementById('qa-list');
+    q.cuenca_distinta.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'qa-row';
+      row.innerHTML = `<div class="s">${b.sigla}</div>
+        <div class="d">Declarada ${b.declarada} → ${b.poligono || 'fuera de cuencas'}${b.dist_km != null ? ` (a ${b.dist_km} km)` : ''} · ${b.emp}</div>`;
+      row.addEventListener('click', () => flyToLatLon(b.id, b.sigla, b.lat, b.lon));
+      list.appendChild(row);
+    });
+  });
+  const fracReady = fracData ? Promise.resolve(fracData) : fetch('data/fractura.json').then(r => r.json());
+  fracReady.then(fd => {
+    fracData = fd;
+    const ev = fd.evolucion_vm;
+    chartFrac = new Chart(document.getElementById('chart-frac'), {
+      data: {
+        labels: ev.map(e => e.anio),
+        datasets: [
+          { type: 'line', label: 'Rama m', data: ev.map(e => e.rama), borderColor: '#4db6f0', pointRadius: 2, borderWidth: 1.5, yAxisID: 'y1' },
+          { type: 'line', label: 'Etapas ×50', data: ev.map(e => e.etapas * 50), borderColor: '#50e080', pointRadius: 2, borderWidth: 1.5, yAxisID: 'y1' },
+          { type: 'bar', label: 'm³eq 12m / km', data: ev.map(e => e.eq12_km), backgroundColor: '#e0702088', yAxisID: 'y2' },
+        ],
+      },
+      options: {
+        animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } },
+                   tooltip: { callbacks: { label: c => c.dataset.label === 'Etapas ×50'
+                     ? `Etapas: ${c.raw / 50}` : `${c.dataset.label}: ${fmtNum(c.raw)}` } } },
+        scales: {
+          x:  { ticks: { font: { size: 9 } }, grid: { color: '#2a2f42' } },
+          y1: { position: 'left', ticks: { font: { size: 9 } }, grid: { color: '#2a2f42' } },
+          y2: { position: 'right', ticks: { font: { size: 9 }, callback: v => fmtM(v) }, grid: { drawOnChartArea: false } },
+        },
+      },
+    });
+    const short = e => e.replace(/\s+(S\.A\.U\.?|S\.A\.|S\.R\.L\.|SAU|SL)$/i, '').replace(' ARGENTINA', '');
+    document.getElementById('frac-emp').innerHTML =
+      `<tr><th>Operador</th><th>n</th><th>Rama m</th><th>Etapas</th><th>% gas</th><th>m³eq/km</th></tr>` +
+      fd.empresas_vm.map(e => `<tr><td>${short(e.empresa)}</td><td>${e.n}</td><td>${fmtNum(e.rama)}</td><td>${e.etapas}</td>
+        <td>${e.pct_gas}%</td><td class="hi">${fmtNum(e.eq12_km)}</td></tr>`).join('');
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────

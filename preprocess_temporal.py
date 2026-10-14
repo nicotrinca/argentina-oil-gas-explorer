@@ -7,7 +7,7 @@ import json
 import pandas as pd
 
 YEARS = [2022, 2023, 2024, 2025, 2026]
-COLS  = ["sigla", "anio", "mes", "prod_pet", "prod_gas", "cuenca", "provincia", "empresa"]
+COLS  = ["idpozo", "anio", "mes", "prod_pet", "prod_gas", "cuenca", "provincia", "empresa"]
 
 print("Cargando todos los años...")
 frames = []
@@ -90,18 +90,19 @@ last_24 = all_periods[-24:]
 recent = prod[prod["periodo"].isin(last_24)].copy()
 
 sparklines = {}
-# Agregar primero por sigla+periodo (un pozo puede tener múltiples formaciones)
+# Agregar primero por pozo+periodo (un pozo puede tener múltiples formaciones).
+# Clave idpozo: la sigla no es única en el padrón.
 recent_agg = (
-    recent.groupby(["sigla", "periodo"])
+    recent.groupby(["idpozo", "periodo"])
     .agg(prod_pet=("prod_pet", "sum"), prod_gas=("prod_gas", "sum"))
     .reset_index()
 )
-for sigla, grp in recent_agg.groupby("sigla"):
+for idpozo, grp in recent_agg.groupby("idpozo"):
     grp_s = grp.set_index("periodo").reindex(last_24)
     pet_vals = grp_s["prod_pet"].fillna(0).round(0).astype(int).tolist()
     gas_vals = grp_s["prod_gas"].fillna(0).round(0).astype(int).tolist()
     if max(pet_vals) > 0 or max(gas_vals) > 0:
-        sparklines[sigla.strip()] = {"p": pet_vals, "g": gas_vals}
+        sparklines[int(idpozo)] = {"p": pet_vals, "g": gas_vals}
 
 with open("data/sparklines.json", "w", encoding="utf-8") as f:
     json.dump({"periodos": last_24, "pozos": sparklines}, f,

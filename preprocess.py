@@ -12,15 +12,16 @@ from shapely.geometry import shape
 print("Cargando producción 2024...")
 prod = pd.read_csv(
     "data/produccion-2024.csv",
-    usecols=["sigla", "anio", "mes", "prod_pet", "prod_gas", "prod_agua",
+    usecols=["idpozo", "sigla", "anio", "mes", "prod_pet", "prod_gas", "prod_agua",
              "empresa", "cuenca", "provincia", "tipo_de_recurso",
              "areapermisoconcesion", "tipoestado"],
     encoding="utf-8-sig",
     low_memory=False,
 )
 
-# Solo pozos con alguna producción en 2024
-prod_agg = prod.groupby("sigla").agg(
+# Solo pozos con alguna producción en 2024 (clave idpozo: la sigla no es única)
+prod_agg = prod.groupby("idpozo").agg(
+    sigla=("sigla", "first"),
     prod_pet_total=("prod_pet", "sum"),
     prod_gas_total=("prod_gas", "sum"),
     prod_agua_total=("prod_agua", "sum"),
@@ -55,7 +56,7 @@ pozos[["lon", "lat"]] = pozos["geojson"].apply(
 pozos = pozos.dropna(subset=["lon", "lat"])
 
 # Join por sigla
-merged = activos.merge(pozos[["sigla", "lon", "lat", "formacion", "profundidad", "tipopozo"]], on="sigla", how="left")
+merged = activos.merge(pozos[["idpozo", "lon", "lat", "formacion", "profundidad", "tipopozo"]], on="idpozo", how="left")
 merged = merged.dropna(subset=["lon", "lat"])
 print(f"  Pozos con coordenadas: {len(merged):,}")
 
@@ -104,6 +105,7 @@ for _, row in gdf.iterrows():
         int(row.ma),
         row.est or "",
         (row.sigla or "").strip(),
+        int(row.idpozo),
     ])
 
 out_path = "data/pozos.js"
@@ -119,7 +121,7 @@ print("Calculando stats por cuenca...")
 cuenca_stats = (
     prod_agg.groupby("cuenca")
     .agg(
-        pozos_activos=("sigla", "count"),
+        pozos_activos=("idpozo", "count"),
         prod_pet_total=("prod_pet_total", "sum"),
         prod_gas_total=("prod_gas_total", "sum"),
     )
@@ -134,7 +136,7 @@ print("Stats por cuenca guardadas.")
 # Stats por empresa (top 20)
 top_empresas = (
     prod_agg.groupby("empresa")
-    .agg(prod_pet_total=("prod_pet_total", "sum"), pozos=("sigla", "count"))
+    .agg(prod_pet_total=("prod_pet_total", "sum"), pozos=("idpozo", "count"))
     .sort_values("prod_pet_total", ascending=False)
     .head(20)
     .reset_index()

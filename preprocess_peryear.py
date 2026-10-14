@@ -1,11 +1,15 @@
 """
 Genera data/pozos_YYYY.js para cada año disponible.
+
+La clave del pozo es 'idpozo': la sigla NO es única en el padrón (ej. "T-22" es un
+pozo de El Trébol en Cuyana y otro de Tecpetrol en el Noroeste). Agrupar o cruzar por
+sigla suma la producción de pozos distintos y duplica ubicaciones.
 """
 import json
 import pandas as pd
 
 YEARS = [2022, 2023, 2024, 2025, 2026]
-USECOLS = ["sigla", "prod_pet", "prod_gas", "prod_agua",
+USECOLS = ["idpozo", "sigla", "prod_pet", "prod_gas", "prod_agua",
            "empresa", "cuenca", "provincia", "tipo_de_recurso", "tipoestado", "mes"]
 
 # Cargar coordenadas una sola vez
@@ -16,7 +20,7 @@ def extract_coords(g):
         c = json.loads(g)["coordinates"]; return round(c[1],4), round(c[0],4)
     except: return None, None
 pozos[["lat","lon"]] = pozos["geojson"].apply(lambda x: pd.Series(extract_coords(x)))
-coords = pozos.dropna(subset=["lat","lon"]).set_index("sigla")[["lat","lon","formacion"]]
+coords = pozos.dropna(subset=["lat","lon"]).set_index("idpozo")[["lat","lon","formacion","sigla"]]
 print(f"  {len(coords):,} pozos con coords")
 
 # ── Saneamiento de coordenadas ──────────────────────────────────────────────
@@ -29,7 +33,7 @@ LAT_MIN, LAT_MAX, LON_MIN, LON_MAX = -56.0, -21.0, -74.0, -53.0
 KNOWN_BAD = {"ENE.LP.CdP x-14"}  # prov. La Pampa pero geolocalizado en Paraguay
 def in_ar(la, lo): return LAT_MIN <= la <= LAT_MAX and LON_MIN <= lo <= LON_MAX
 def fix_coords(row):
-    if str(row.name).strip() in KNOWN_BAD:
+    if str(row["sigla"]).strip() in KNOWN_BAD:
         return pd.Series([None, None])
     la, lo = row["lat"], row["lon"]
     if in_ar(la, lo):  return pd.Series([la, lo])
@@ -45,13 +49,13 @@ print(f"  Saneadas: {n_swap} con lat/lon invertidas corregidas, {n0 - len(coords
 for yr in YEARS:
     print(f"Procesando {yr}...", end=" ", flush=True)
     df = pd.read_csv(f"data/produccion-{yr}.csv", usecols=USECOLS, encoding="utf-8-sig", low_memory=False)
-    agg = df.groupby("sigla").agg(
+    agg = df.groupby("idpozo").agg(
         pet=("prod_pet","sum"), gas=("prod_gas","sum"), agua=("prod_agua","sum"),
         emp=("empresa","first"), cu=("cuenca","first"), prov=("provincia","first"),
         tr=("tipo_de_recurso","first"), est=("tipoestado","first"), ma=("mes","count")
     ).reset_index()
     agg = agg[(agg.pet > 0) | (agg.gas > 0)]
-    merged = agg.join(coords, on="sigla", how="inner")
+    merged = agg.join(coords, on="idpozo", how="inner")
     rows = []
     for _, r in merged.iterrows():
         rows.append([
@@ -59,7 +63,7 @@ for yr in YEARS:
             int(r.pet), int(r.gas), int(r.agua),
             r.emp or "", r.cu or "", r.prov or "",
             r.tr or "", r.formacion or "", int(r.ma), r.est or "",
-            (r.sigla or "").strip(),
+            (r.sigla or "").strip(), int(r.idpozo),
         ])
     path = f"data/pozos_{yr}.js"
     with open(path, "w", encoding="utf-8") as f:
