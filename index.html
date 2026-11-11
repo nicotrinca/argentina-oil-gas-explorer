@@ -65,14 +65,21 @@
   .stat-box .lbl { font-size: 13px; color: var(--text-mute); margin-top: 5px; }
 
   /* ── Tabs ── */
-  #tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  /* Con 5 pestañas no entran en una fila del sidebar angosto (350 px): pasan a 2 filas (3 + 2),
+     sin achicar letra ni espaciado. Con el sidebar ancho (pestaña Curvas) van en una sola fila. */
+  #sidebar { container-type: inline-size; container-name: sb; }
+  #tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .tab-btn {
-    flex: 1; padding: 13px 8px; background: none; border: none; color: var(--text-mute);
-    font-size: 13px; font-weight: 600; cursor: pointer; letter-spacing: .4px;
-    text-transform: uppercase; border-bottom: 2px solid transparent; transition: all .15s; font-size: 14px;
+    flex: 1 1 auto; padding: 13px 8px; background: none; border: none; color: var(--text-mute);
+    font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: .4px; white-space: nowrap;
+    text-transform: uppercase; border-bottom: 2px solid transparent; transition: all .15s;
   }
   .tab-btn:hover { color: var(--text-dim); background: #ffffff08; }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  @container sb (max-width: 600px) {
+    #tabs .tab-btn { flex: 1 0 30%; }
+    #tabs .tab-btn:nth-child(n+4) { flex-basis: 45%; border-top: 1px solid #ffffff10; }
+  }
   .tab-pane { display: none; flex: 1; overflow-y: auto; }
   .tab-pane.active { display: flex; flex-direction: column; }
 
@@ -181,7 +188,8 @@
   .lf-popup-grid { display: grid; grid-template-columns: auto auto; gap: 5px 14px; font-size: 14px; margin-bottom: 8px; }
   .lf-popup-grid .k { color: #5a6b7e; }
   .lf-popup-grid .v { font-weight: 600; color: #1a2533; }
-  .spark-label { font-size: 12px; color: #5a6b7e; margin-bottom: 4px; }
+  .spark-label { font-size: 14px; color: #5a6b7e; margin-bottom: 4px; }
+  .spark-label .ult { color: #6a7890; font-size: 14px; }
 
   /* ── Ranking ── */
   #tab-ranking { padding: 14px; gap: 0; }
@@ -212,7 +220,9 @@
   .band-bar { height: 9px; border-radius: 3px; background: var(--panel-2); position: relative; }
   .band-bar div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
   .band-row .pct { text-align: right; color: var(--text-mute); font-size: 12px; }
-  .geo-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .table-scroll { max-width: 100%; overflow-x: auto; flex-shrink: 0; }
+  .table-scroll .geo-table th { white-space: normal; vertical-align: bottom; }
+  .geo-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .geo-table th { text-align: right; color: var(--text-mute); font-weight: 600; padding: 5px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .geo-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #232838; color: var(--text-dim); white-space: nowrap; }
   .geo-table th:first-child, .geo-table td:first-child { text-align: left; white-space: normal; }
@@ -222,6 +232,46 @@
   .qa-row .s { font-weight: 600; color: var(--text-dim); }
   .qa-row .d { color: var(--text-mute); font-size: 12px; }
   .warn { color: #c0392b; font-weight: 700; }
+
+  /* ── Curvas (curvas tipo y EUR) ── */
+  body.sb-wide #sidebar { width: min(1000px, 66vw); }
+  #tab-curvas { padding: 16px; gap: 10px; }
+  #tab-curvas > * { flex-shrink: 0; }
+  #tab-curvas .section-title { margin: 8px 0 2px; }
+  .curvas-ctrl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .seg { display: flex; gap: 4px; }
+  .seg .metric-btn { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; }
+  .curvas-ctrl label { font-size: 14px; color: var(--text-dim); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .curvas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 12px; }
+  .curvas-box { position: relative; height: 340px; }
+  .curvas-aviso { font-size: 14px; color: #f0c040; min-height: 0; }
+  /* Pestaña Curvas: todo el texto a 14 px como mínimo */
+  #tab-curvas .geo-note, #tab-curvas .chart-label, #tab-curvas .cuenca-chip,
+  #tab-curvas .section-title, #tab-curvas .geo-table { font-size: 14px; }
+  #tab-curvas th[title] { cursor: help; text-decoration: underline dotted; }
+  .geo-table tr.gris td { color: var(--text-mute); opacity: .75; }
+  .supuestos { background: #14171f; border: 1px solid #2a3046; border-radius: 9px; padding: 12px 14px;
+    font-size: 14px; color: var(--text-dim); line-height: 1.55; }
+  .supuestos ul { margin: 4px 0 0 18px; }
+  @media (max-width: 760px) {
+    body.sb-wide #sidebar { width: 100vw; min-width: 0; }
+  }
+  /* Declinación en el popup (fondo blanco de Leaflet) */
+  .decl-txt { font-size: 14px; color: #1a2533; margin-top: 4px; line-height: 1.4; }
+  .decl-box .spark-label { font-size: 14px; }
+  .decl-txt .alcance { display: block; margin-top: 3px; color: #3a4a5e; }
+  /* Encabezado del popup fijo arriba cuando el contenido scrollea (popups con maxHeight).
+     El contenido del popup de pozo es SIEMPRE el contenedor de scroll (overflow-y:auto): si no, cuando el
+     popup entra entero, el sticky se engancha a .leaflet-container (overflow:hidden) y el encabezado
+     aparece a mitad o al pie del popup. */
+  .pozo-popup .leaflet-popup-content { overflow-y: auto; overflow-x: hidden; }
+  .lf-popup-head { position: sticky; top: 0; z-index: 5; background: #fff;
+    margin: 0 0 8px; padding: 0 0 6px; border-bottom: 1px solid #e3e7ee; }
+  .lf-popup-head .lf-popup-empresa { margin-bottom: 2px; }
+  .lf-popup-head .lf-popup-sub { font-size: 14px; color: #3a4a5e; font-weight: 600; }
+  .decl-txt .nota { color: #5a6b7e; }
+  .decl-txt .aviso { color: #c0392b; font-weight: 600; }
+  .decl-txt .aviso.ambar { color: #9a6200; }
 
   /* ── Botón en popup ── */
   .popup-btn {
@@ -277,6 +327,19 @@
 </head>
 <body>
 
+<script>
+// Abierto con doble clic (file://): el navegador bloquea fetch() → sin capas, gráficos ni evolución del pozo.
+if (location.protocol === 'file:') document.addEventListener('DOMContentLoaded', () => {
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#b71c1c;color:#fff;' +
+    'padding:10px 16px;font:15px/1.4 system-ui,sans-serif;text-align:center';
+  d.innerHTML = '⚠ Abriste el archivo directo, así el navegador bloquea las capas (cuencas, yacimientos, áreas), ' +
+    'los gráficos y la evolución de cada pozo. Cerrá esta pestaña y abrí con <b>abrir.bat</b> ' +
+    '(o <code>python -m http.server 8765</code> y entrá a <b>http://localhost:8765</b>).';
+  document.body.appendChild(d);
+});
+</script>
+
 <div id="loading"><div class="spinner"></div><p>Cargando pozos...</p></div>
 
 <div id="sidebar">
@@ -297,6 +360,7 @@
     <button class="tab-btn" data-tab="tendencia">Tendencia</button>
     <button class="tab-btn" data-tab="ranking">Ranking</button>
     <button class="tab-btn" data-tab="geo">Geo</button>
+    <button class="tab-btn" data-tab="curvas">Curvas</button>
   </div>
 
   <div id="tab-filtros" class="tab-pane active">
@@ -399,13 +463,60 @@
       petróleo en los 12 meses siguientes por km de rama (gas convertido 6:1). Solo años con la ventana completa.</div>
 
     <div class="section-title">Productividad por operador (VM)</div>
-    <table class="geo-table" id="frac-emp"></table>
+    <div class="table-scroll"><table class="geo-table" id="frac-emp"></table></div>
     <div class="geo-note">m³eq/km = producción de 12 meses por km de rama (mediana). Los pozos de la ventana de gas y los de
       petróleo están en distinta geología: compará operadores con un % de gas parecido.</div>
 
     <div class="section-title">Control de calidad · cuenca declarada vs. polígono</div>
     <div class="geo-note" id="qa-note"></div>
     <div id="qa-list"></div>
+  </div>
+
+  <div id="tab-curvas" class="tab-pane">
+    <div class="geo-note">Curvas tipo y EUR (producción final estimada) de pozos de Vaca Muerta, por año de arranque
+      (cohorte). Cada pozo va en la ventana de su fluido principal. P10 = optimista, P90 = conservador.</div>
+    <div class="curvas-ctrl">
+      <div class="seg" id="cv-v">
+        <button class="metric-btn active" data-v="p">Petróleo</button>
+        <button class="metric-btn" data-v="g">Gas</button>
+      </div>
+      <div class="seg" id="cv-modo">
+        <button class="metric-btn active" data-modo="mensual">Mensual</button>
+        <button class="metric-btn" data-modo="acum">Acumulada</button>
+      </div>
+      <div class="seg" id="cv-km">
+        <button class="metric-btn active" data-km="0">Por pozo</button>
+        <button class="metric-btn" data-km="1">Por km de rama</button>
+      </div>
+      <label><input type="checkbox" id="cv-log"> escala log</label>
+    </div>
+    <div class="cuenca-selector" id="cv-chips" style="margin-bottom:0"></div>
+    <div class="curvas-aviso" id="cv-aviso"></div>
+    <div class="curvas-grid">
+      <div class="chart-wrap">
+        <div class="chart-label" id="cv-t1">Curvas tipo · P50 por cohorte</div>
+        <div class="curvas-box"><canvas id="chart-curvas"></canvas></div>
+        <div class="geo-note"><b>Punteado: pocos pozos (n en el tooltip).</b> Son los meses donde quedan menos de la mitad
+          de los pozos de la cohorte (los más viejos o los que siguen produciendo).</div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-label" id="cv-t2">EUR vs. largo de rama</div>
+        <div class="curvas-box"><canvas id="chart-eur"></canvas></div>
+        <div class="geo-note" id="cv-nota2"></div>
+      </div>
+    </div>
+
+    <div class="section-title">EUR por cohorte</div>
+    <div style="overflow-x:auto"><table class="geo-table" id="cv-coh"></table></div>
+    <div class="geo-note" id="cv-coh-nota"></div>
+
+    <div class="section-title">Operadores</div>
+    <div class="geo-note" id="cv-emp-sub"></div>
+    <div style="overflow-x:auto"><table class="geo-table" id="cv-emp"></table></div>
+    <div class="geo-note" id="cv-emp-fuera"></div>
+
+    <div class="section-title">Supuestos</div>
+    <div class="supuestos" id="cv-supuestos"></div>
   </div>
 </div>
 
@@ -466,7 +577,7 @@ const areasLayer = L.geoJSON(null, {
         <span class="k">Provincia</span> <span class="v">${p.prov_pozos || '—'}</span>
         ${p.km_oleo != null ? `<span class="k">Ductos (km)</span><span class="v">🛢 ${fmtNum(p.km_oleo)} · ⛽ ${fmtNum(p.km_gas)} · 💧 ${fmtNum(p.km_agua)}</span>` : ''}
         <span class="k">Actualizado</span><span class="v">${p.mod || '—'}</span>
-      </div>${p.socios ? `<div class="spark-label" style="margin-top:6px">Participación</div><div style="font-size:12px;color:#5a6b7e;margin-bottom:8px">${p.socios}</div>` : ''}
+      </div>${p.socios ? `<div class="spark-label" style="margin-top:6px">Participación</div><div style="font-size:14px;color:#5a6b7e;margin-bottom:8px">${p.socios}</div>` : ''}
       <button class="popup-btn" onclick="filterByArea(${f._idx})">📍 Ver solo los pozos de esta área</button>`,
       { maxWidth: 300 });
     lyr.on('mouseover', () => lyr.setStyle({ fillOpacity: 0.25, weight: 2 }));
@@ -860,16 +971,18 @@ function pozoPopupHTML(r) {
     if (sp) {
       const per = sparkData.periodos;
       const ultPet = sp.p[sp.p.length-1];
-      const ultGas = sp.g[sp.g.length-1] / 1000;
+      // sparklines.json trae el gas en Mm³ (miles de m³): se muestra tal cual, sin dividir
+      const ultGas = sp.g[sp.g.length-1];
       sparkHtml = `
-        <div class="spark-label" style="margin-top:8px">Petróleo m³/mes · últimos 24 meses <span style="color:#8794a8">(último: ${fmtNum(ultPet)})</span></div>
+        <div class="spark-label" style="margin-top:8px">Petróleo m³/mes · últimos 24 meses <span class="ult">(último: ${fmtNum(ultPet)} m³)</span></div>
         ${monthlyBarsSVG(sp.p, '#e07020', per, 'm³')}
-        <div class="spark-label" style="margin-top:6px">Gas Mm³/mes <span style="color:#8794a8">(último: ${fmtNum(Math.round(ultGas))})</span></div>
-        ${monthlyBarsSVG(sp.g.map(v=>v/1000), '#4db6f0', per, 'Mm³')}`;
+        <div class="spark-label" style="margin-top:6px">Gas Mm³/mes <span class="ult">(último: ${fmtGasMes(ultGas)} Mm³)</span></div>
+        ${monthlyBarsSVG(sp.g, '#4db6f0', per, 'Mm³', fmtGasMes)}`;
     }
   }
   return `
-    <div class="lf-popup-empresa">${r[I.emp] || '—'}</div>
+    <div class="lf-popup-head"><div class="lf-popup-empresa">${r[I.emp] || '—'}</div>
+      <div class="lf-popup-sub">${sigla}</div></div>
     <div class="lf-popup-grid">
       <span class="k">Sigla</span>      <span class="v">${sigla}</span>
       <span class="k">Cuenca</span>     <span class="v">${r[I.cu] || '—'}</span>
@@ -882,10 +995,10 @@ function pozoPopupHTML(r) {
       <span class="k">Corte agua</span><span class="v">${(r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1)+'%' : '—'}</span>
       <span class="k">Meses activo</span><span class="v">${r[I.ma]}</span>
       <span class="k">Tipo</span>       <span class="v">${r[I.tr] || '—'}</span>
-    </div>${geoPopupHTML(id, r[I.cu])}${fracPopupHTML(id)}${sparkHtml}`;
+    </div>${geoPopupHTML(id, r[I.cu])}${fracPopupHTML(id)}${sparkHtml}${declPlaceholder(r)}`;
 }
 function openPopup(marker, r) {
-  marker.bindPopup(pozoPopupHTML(r), { maxWidth: 290 }).openPopup();
+  marker.bindPopup(pozoPopupHTML(r), { maxWidth: 290, className: 'pozo-popup' }).openPopup();
 }
 
 function miniSparkSVG(vals, color) {
@@ -1106,6 +1219,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'geo') buildGeoTab();
+    const ancho = btn.dataset.tab === 'curvas';
+    if (document.body.classList.contains('sb-wide') !== ancho) {
+      document.body.classList.toggle('sb-wide', ancho);
+      setTimeout(() => map.invalidateSize(), 60);
+    }
+    if (btn.dataset.tab === 'curvas') buildCurvasTab();
     if (btn.dataset.tab === 'tendencia' && chartNac) {
       setTimeout(() => { chartNac.resize(); if (chartCuenca) chartCuenca.resize(); if (chartEmpresa) chartEmpresa.resize(); }, 50);
     }
@@ -1132,9 +1251,13 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 let rankingData = null;
 let activeRank  = 'top_productores';
 
-fetch('data/ranking.json').then(r => r.json()).then(d => {
+fetch('data/ranking.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(d => {
   rankingData = d;
   renderRanking(activeRank);
+}).catch(e => {
+  document.getElementById('ranking-list').innerHTML =
+    `<div class="geo-note" style="font-size:14px;color:#f0c040;padding:8px 4px">No se pudo cargar data/ranking.json (${e.message}). ` +
+    'Revisá que el servidor esté corriendo y recargá la página.</div>';
 });
 
 document.querySelectorAll('.rank-btn').forEach(btn => {
@@ -1178,7 +1301,7 @@ function flyToPozo(id) {
   const ll = [row[I.lat], row[I.lon]];
   map.invalidateSize();
   try { map.flyTo(ll, 14, { duration: 1.2 }); } catch (e) { map.setView(ll, 14); }
-  L.popup({ maxWidth: 290 }).setLatLng(ll).setContent(pozoPopupHTML(row)).openOn(map);
+  L.popup({ maxWidth: 290, className: 'pozo-popup' }).setLatLng(ll).setContent(pozoPopupHTML(row)).openOn(map);
 }
 
 // ── Buscador de pozo por sigla ──────────────────────────────────────────────
@@ -1255,8 +1378,8 @@ function fitDecline(vals) {
 }
 
 // ── Barras de producción mensual (en popup) ───────────────────────────────
-function monthlyBarsSVG(vals, color, periodos, unidad) {
-  const W = 270, H = 62, padL = 2, padR = 2, padT = 4, axisH = 12;
+function monthlyBarsSVG(vals, color, periodos, unidad, fmt = fmtNum) {
+  const W = 270, H = 74, padL = 2, padR = 2, padT = 4, axisH = 18;
   const plotH = H - axisH - padT;
   const n = vals.length;
   const maxVal = Math.max(...vals, 1);
@@ -1269,7 +1392,7 @@ function monthlyBarsSVG(vals, color, periodos, unidad) {
     const x = padL + i * ((W - padL - padR) / n);
     const y = padT + plotH - h;
     const per = periodos && periodos[i] ? periodos[i].slice(0,7) : '';
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${color}" opacity="${v>0?0.9:0.2}"><title>${per}: ${fmtNum(v)} ${unidad}</title></rect>`;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${color}" opacity="${v>0?0.9:0.2}"><title>${per}: ${fmt(v)} ${unidad}</title></rect>`;
   }
   // Etiquetas de meses: primero, medio y último
   let ticks = '';
@@ -1278,7 +1401,7 @@ function monthlyBarsSVG(vals, color, periodos, unidad) {
     idxs.forEach(i => {
       const x = padL + i * ((W - padL - padR) / n) + bw/2;
       const anchor = i === 0 ? 'start' : (i === n-1 ? 'end' : 'middle');
-      ticks += `<text x="${x.toFixed(1)}" y="${H-2}" text-anchor="${anchor}" font-size="8" fill="#7080a0">${periodos[i].slice(0,7)}</text>`;
+      ticks += `<text x="${x.toFixed(1)}" y="${H-2}" text-anchor="${anchor}" font-size="12" fill="#9aa8c0">${periodos[i].slice(0,7)}</text>`;
     });
   }
   return `<svg width="${W}" height="${H}" style="display:block;background:#1e2235;border-radius:3px">
@@ -1288,7 +1411,7 @@ function monthlyBarsSVG(vals, color, periodos, unidad) {
 }
 
 function declineSVG(vals, color) {
-  const W = 260, H = 50, pad = 3;
+  const W = 260, H = 60, pad = 3;
   const maxVal = Math.max(...vals, 1);
   const fit = fitDecline(vals);
 
@@ -1316,7 +1439,7 @@ function declineSVG(vals, color) {
     // Meses hasta llegar al 20% del pico
     const mesesDecl = fit.D > 0 ? Math.round(Math.log(0.2) / -fit.D) : null;
     if (mesesDecl && mesesDecl > 0 && mesesDecl < 500) {
-      proyInfo = `<text x="${W-2}" y="${H-1}" text-anchor="end" font-size="8" fill="#7080a0">declino al 20%: ~${mesesDecl} meses</text>`;
+      proyInfo = `<text x="${W-2}" y="${H-1}" text-anchor="end" font-size="12" fill="#9aa8c0">declino al 20%: ~${mesesDecl} meses</text>`;
     }
   }
 
@@ -1429,6 +1552,505 @@ function buildGeoTab() {
         <td>${e.pct_gas}%</td><td class="hi">${fmtNum(e.eq12_km)}</td></tr>`).join('');
   });
 }
+
+// ── Curvas tipo y EUR (pestaña Curvas + declinación en el popup) ─────────────
+// curvas.json: curvas tipo, EUR por cohorte/operador y dispersión (Vaca Muerta).
+// curvas_pozos.json (~3 MB): serie y ajuste Arps de cada pozo NC; se baja una sola vez, a demanda.
+const DIAS_MES = 30.4375;
+const COH_COLORS = ['#e07020','#4db6f0','#50e080','#f0c040','#e050b0','#a070f0',
+                    '#50c0c0','#f08080','#c0d050','#7090f0','#f0a060','#90e0c0'];
+const cohColor = c => COH_COLORS[((+c - 2011) % COH_COLORS.length + COH_COLORS.length) % COH_COLORS.length];
+let curvasData = null, curvasBuilt = false, chartCurvas = null, chartEur = null;
+let cvV = 'p', cvModo = 'mensual', cvKm = false, cvLog = false;
+const cvSel = new Set();
+let curvasPozosP = null, curvasPozos = null, declChart = null;
+
+function fmtDec(n, d) {
+  return (+n).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function fmtCorto(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return fmtDec(v / 1e6, 1) + ' M';
+  if (a >= 1e4) return fmtNum(Math.round(v / 1e3)) + ' mil';
+  if (a >= 10) return fmtNum(v);
+  return fmtDec(v, a >= 1 || v === 0 ? 0 : 1);
+}
+const fmtNull = (n, f = fmtNum) => n == null ? '—' : f(n);
+const empCorta = e => e.replace(/\s+(S\.A\.U\.?|S\.A\.|S\.R\.L\.|SAU|SL)$/i, '').replace(' ARGENTINA', '');
+// Ticks log con formato a elección; si el eje abarca más de 3 décadas, solo 1 y 3 × 10^k (2 por década)
+function tickLogCon(v, f, scale) {
+  const dec = scale && scale.min > 0 && scale.max > 0 ? Math.log10(scale.max / scale.min) : 0;
+  const m = v / Math.pow(10, Math.floor(Math.log10(v) + 1e-9));
+  const marcas = dec > 3 ? [1, 3] : [1, 2, 5];
+  return marcas.some(k => Math.abs(m - k) < 1e-6) ? f(v) : '';
+}
+// Decimales sin ceros de relleno (para ejes)
+const fmtDecMax = (n, d) => (+n).toLocaleString('es-AR', { maximumFractionDigits: d });
+// Gas acumulado / EUR en MMm³ (millones de m³ = Mm³ ÷ 1000): decimales según magnitud
+function fmtMM(v, eje = false) {
+  if (!v) return '0';
+  const a = Math.abs(v), d = a >= 100 ? 0 : a >= 10 ? 1 : a >= 0.1 ? 2 : 3;
+  return eje ? fmtDecMax(v, d) : fmtDec(v, d);
+}
+// Caudal de gas en Mm³/mes: número entero sin "mil" (evita "mil Mm³"); decimales si es chico
+const fmtGasMes = v => Math.abs(v) >= 10 ? fmtNum(v) : fmtDecMax(v, Math.abs(v) >= 1 ? 1 : 2);
+// EUR/acumulada con unidad explícita: petróleo m³, gas MMm³ (el dato viene en Mm³)
+const fmtEurU = (v, fluido) => fluido === 'p' ? `${fmtNum(v)} m³` : `${fmtMM(v / 1000)} MMm³`;
+
+function loadCurvasPozos() {
+  if (!curvasPozosP) curvasPozosP = fetch('data/curvas_pozos.json').then(r => r.json())
+    .then(d => (curvasPozos = d))
+    .catch(e => { curvasPozosP = null; throw e; });
+  return curvasPozosP;
+}
+
+// Gas: caudal mensual en Mm³/mes; acumulada y EUR en MMm³ (los JSON traen todo el gas en Mm³)
+const cvGasMM = (modo = cvModo) => cvV === 'g' && modo !== 'mensual';
+const cvFactor = (modo = cvModo) => cvGasMM(modo) ? 1 / 1000 : 1;
+function cvUnidad(conKm = cvKm, modo = cvModo) {
+  const u = cvV === 'p' ? 'm³' : (modo === 'mensual' ? 'Mm³' : 'MMm³');
+  return u + (modo === 'mensual' ? '/mes' : '') + (conKm ? '/km' : '');
+}
+// Formato de valores (ya escalados) para tooltip y ejes según fluido y modo
+function cvFmt(v, modo = cvModo, eje = false) {
+  if (cvV === 'p') return eje ? fmtCorto(v) : fmtNum(v);
+  return cvGasMM(modo) ? fmtMM(v, eje) : fmtGasMes(v);
+}
+// EUR de la pestaña: petróleo m³, gas MMm³
+const cvEurU = () => cvV === 'p' ? 'm³' : 'MMm³';
+const cvEur = v => v == null ? '—' : (cvV === 'p' ? fmtNum(v) : fmtMM(v / 1000));
+const CV_F = { size: 14 };
+let curvasCargando = false, cvListeners = false;
+
+function buildCurvasTab() {
+  if (curvasBuilt) {
+    setTimeout(() => { if (chartCurvas) chartCurvas.resize(); if (chartEur) chartEur.resize(); }, 80);
+    return;
+  }
+  // Si la carga falla, curvasBuilt queda en false y se reintenta al volver a abrir la pestaña
+  if (curvasCargando) return;
+  curvasCargando = true;
+  document.getElementById('cv-aviso').textContent = '';
+  loadCurvasPozos().catch(() => {});
+  fetch('data/curvas.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(d => {
+    curvasData = d;
+    curvasBuilt = true;
+    curvasCargando = false;
+    if (!cvListeners) {
+      cvListeners = true;
+      const seg = (id, fn) => document.querySelectorAll(`#${id} .metric-btn`).forEach(b =>
+        b.addEventListener('click', () => {
+          document.querySelectorAll(`#${id} .metric-btn`).forEach(x => x.classList.remove('active'));
+          b.classList.add('active'); fn(b); renderCurvas();
+        }));
+      seg('cv-v', b => { cvV = b.dataset.v; buildCvChips(); });
+      seg('cv-modo', b => { cvModo = b.dataset.modo; });
+      seg('cv-km', b => { cvKm = b.dataset.km === '1'; });
+      document.getElementById('cv-log').addEventListener('change', e => { cvLog = e.target.checked; renderCurvas(); });
+    }
+    buildCvChips();
+    renderCurvas();
+    renderSupuestos();
+  }).catch(e => {
+    curvasCargando = false;
+    curvasBuilt = false;
+    curvasData = null;
+    document.getElementById('cv-aviso').textContent = 'No se pudo cargar data/curvas.json (' + e.message +
+      '). Volvé a abrir la pestaña para reintentar.';
+  });
+}
+
+function buildCvChips() {
+  const coh = Object.keys(curvasData.curvas[cvV] || {}).map(Number).sort((a, b) => a - b);
+  [...cvSel].forEach(c => { if (!coh.includes(c)) cvSel.delete(c); });
+  if (!cvSel.size) [2019, 2021, 2023, 2025].filter(c => coh.includes(c)).forEach(c => cvSel.add(c));
+  if (!cvSel.size && coh.length) cvSel.add(coh[coh.length - 1]);
+  const wrap = document.getElementById('cv-chips');
+  wrap.innerHTML = '';
+  coh.forEach(c => {
+    const color = cohColor(c);
+    const chip = document.createElement('div');
+    chip.className = 'cuenca-chip';
+    chip.textContent = c;
+    chip.dataset.coh = c;
+    const pintar = () => {
+      const on = cvSel.has(c);
+      chip.classList.toggle('active', on);
+      chip.style.background = on ? color + '55' : '';
+      chip.style.color = on ? color : '';
+      chip.style.borderColor = on ? color : '';
+    };
+    chip.addEventListener('click', () => {
+      if (cvSel.has(c)) cvSel.delete(c); else cvSel.add(c);
+      pintar(); renderCurvas();
+    });
+    pintar();
+    wrap.appendChild(chip);
+  });
+}
+
+function renderCurvas() {
+  if (!curvasData) return;
+  renderCurvasChart();
+  renderEurChart();
+  renderCurvasTablas();
+}
+
+function renderCurvasChart() {
+  const key = cvModo + (cvKm ? '_km' : '');
+  const sel = [...cvSel].sort((a, b) => a - b);
+  const unidad = cvUnidad();
+  const fac = cvFactor();
+  const yv = v => v == null ? null : ((cvLog && !(v > 0)) ? null : v * fac);
+  const datasets = [], vacias = [];
+  sel.forEach(c => {
+    const cu = curvasData.curvas[cvV][c] && curvasData.curvas[cvV][c][key];
+    const cola = (cu && cu.cola) || { p10: [], p50: [], p90: [], n: [] };
+    if (!cu || (!cu.p50.length && !cola.p50.length)) { vacias.push(c); return; }
+    const color = cohColor(c);
+    const L0 = cu.p50.length;
+    const pts = (arr, nArr, off) => arr.map((v, i) => ({ x: off + i + 1, y: yv(v), n: nArr[i] }));
+    const main = pts(cu.p50, cu.n, 0);
+    const tail = pts(cola.p50, cola.n, L0);
+    if (main.length) datasets.push({ type: 'line', label: `${c} P50`, data: main, borderColor: color,
+      backgroundColor: color, borderWidth: 2, pointRadius: 0, pointHitRadius: 6, _coh: c });
+    if (tail.length) datasets.push({ type: 'line', label: `${c} P50 (pocos pozos)`, data: (main.length ? [main[L0 - 1]] : []).concat(tail),
+      borderColor: color, backgroundColor: color, borderWidth: 3, borderDash: [10, 6], pointRadius: 0, pointHitRadius: 6, _coh: c, _cola: true });
+    if (sel.length === 1) {
+      const lo = pts(cu.p90, cu.n, 0).concat(pts(cola.p90, cola.n, L0));
+      const hi = pts(cu.p10, cu.n, 0).concat(pts(cola.p10, cola.n, L0));
+      datasets.push({ type: 'line', label: 'P90 (conservador)', data: lo, borderColor: color + '66', borderWidth: 1,
+        pointRadius: 0, pointHitRadius: 4, fill: false, _banda: true });
+      datasets.push({ type: 'line', label: 'P10 (optimista)', data: hi, borderColor: color + '66', borderWidth: 1,
+        backgroundColor: color + '26', pointRadius: 0, pointHitRadius: 4, fill: '-1', _banda: true });
+    }
+  });
+  const aviso = [];
+  if (vacias.length) aviso.push(`Sin curva tipo (menos de ${curvasData.min_n_curva} pozos con ese dato): ${vacias.join(', ')}.`);
+  if (!sel.length) aviso.push('Elegí al menos una cohorte.');
+  document.getElementById('cv-aviso').textContent = aviso.join(' ');
+  document.getElementById('cv-t1').textContent = `Curvas tipo · ${cvV === 'p' ? 'petróleo' : 'gas'} ` +
+    `${cvModo === 'mensual' ? 'mensual' : 'acumulada'} · ${unidad} · ` + (sel.length === 1 ? 'P50 con banda P10–P90' : 'P50 por cohorte');
+  const opts = {
+    animation: false, responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'x', intersect: false },
+    plugins: {
+      legend: { labels: { boxWidth: 14, font: CV_F, filter: it => !/pocos pozos/.test(it.text) } },
+      tooltip: {
+        titleFont: CV_F, bodyFont: CV_F,
+        filter: it => !it.dataset._banda || cvSel.size === 1,
+        callbacks: {
+          title: it => it.length ? `Mes ${it[0].raw.x} desde el arranque` : '',
+          label: c => `${c.dataset.label}: ${c.raw.y == null ? '—' : cvFmt(c.raw.y)} ${unidad}` +
+            (c.dataset._banda ? '' : ` · n = ${fmtNum(c.raw.n)} pozos`),
+        },
+      },
+    },
+    scales: {
+      x: { type: 'linear', min: 0, title: { display: true, text: 'meses desde el arranque', font: CV_F },
+           ticks: { stepSize: 12, font: CV_F }, grid: { color: '#2a2f42' } },
+      y: { type: cvLog ? 'logarithmic' : 'linear', beginAtZero: !cvLog, title: { display: true, text: unidad, font: CV_F },
+           ticks: { font: CV_F, callback: function (v) {
+             return cvLog ? tickLogCon(v, x => cvFmt(x, cvModo, true), this) : cvFmt(v, cvModo, true); } },
+           grid: { color: '#2a2f42' } },
+    },
+  };
+  if (chartCurvas) chartCurvas.destroy();
+  chartCurvas = new Chart(document.getElementById('chart-curvas'), { data: { datasets }, options: opts });
+}
+
+function renderEurChart() {
+  const disp = curvasData.dispersion[cvV] || [];
+  const u = cvEurU();
+  const fe = cvV === 'p' ? 1 : 1 / 1000;
+  const conId = disp.some(p => p.length > 3 && p[3] != null);
+  const hayJoven = disp.some(p => p[4]);
+  const punto = p => ({ x: p[0] / 1000, y: p[1] * fe, c: p[2], id: p.length > 3 ? p[3] : null, j: !!p[4] });
+  const sel = [...cvSel].sort((a, b) => a - b);
+  const estilo = ctx => (ctx.raw && ctx.raw.j) ? 'triangle' : 'circle';
+  const datasets = [{
+    label: 'otras cohortes', data: disp.filter(p => !cvSel.has(p[2])).map(punto),
+    backgroundColor: '#8794a833', borderColor: '#8794a855', pointRadius: 3, pointStyle: estilo,
+  }].concat(sel.map(c => ({
+    label: String(c), data: disp.filter(p => p[2] === c).map(punto),
+    backgroundColor: cohColor(c) + 'aa', borderColor: cohColor(c), borderWidth: 1,
+    pointRadius: ctx => (ctx.raw && ctx.raw.j) ? 5 : 4, pointStyle: estilo,
+    pointBorderColor: ctx => (ctx.raw && ctx.raw.j) ? '#ffffff' : cohColor(c),
+  })));
+  document.getElementById('cv-t2').textContent = `EUR por pozo (${u}) vs. largo de rama (km) · ` +
+    `${cvV === 'p' ? 'petróleo' : 'gas'}`;
+  document.getElementById('cv-nota2').innerHTML =
+    `Cada punto es un pozo con EUR válida (ajuste aceptado o pozo parado) y rama conocida. ` +
+    `En gris, las cohortes no elegidas.` + (hayJoven ? ' Triángulos con borde blanco: pozos jóvenes (b limitado).' : '') +
+    (conId ? ' Clic en un punto para verlo en el mapa.' : '') + '<span id="cv-click-aviso" class="warn"></span>';
+  const opts = {
+    animation: false, responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'nearest', intersect: true },
+    plugins: {
+      legend: { labels: { boxWidth: 14, font: CV_F } },
+      tooltip: { titleFont: CV_F, bodyFont: CV_F,
+        callbacks: { label: c => `Cohorte ${c.raw.c} · rama ${fmtNum(c.raw.x * 1000)} m · EUR ${cvV === 'p' ? fmtNum(c.raw.y) : fmtMM(c.raw.y)} ${u}` +
+        (c.raw.j ? ' · pozo joven' : '') + (c.raw.id != null ? ` · idpozo ${c.raw.id}` : '') } },
+    },
+    scales: {
+      x: { type: 'linear', title: { display: true, text: 'rama horizontal (km)', font: CV_F },
+           ticks: { font: CV_F, callback: v => fmtDec(v, 1) }, grid: { color: '#2a2f42' } },
+      y: { type: cvLog ? 'logarithmic' : 'linear', beginAtZero: !cvLog, title: { display: true, text: `EUR (${u})`, font: CV_F },
+           ticks: { font: CV_F, callback: function (v) {
+             return cvLog ? tickLogCon(v, x => cvFmt(x, 'acum', true), this) : cvFmt(v, 'acum', true); } },
+           grid: { color: '#2a2f42' } },
+    },
+    onClick: (ev, els) => {
+      if (!els.length) return;
+      const raw = chartEur.data.datasets[els[0].datasetIndex].data[els[0].index];
+      if (raw.id == null) return;
+      if (window.POZOS.some(r => r[I.id] === +raw.id)) { flyToPozo(raw.id); return; }
+      document.getElementById('cv-click-aviso').textContent =
+        ` El pozo ${raw.id} no tiene producción en ${document.getElementById('f-year').value}: cambiá el año en el mapa.`;
+    },
+    onHover: (ev, els) => { ev.native.target.style.cursor = els.length && conId ? 'pointer' : 'default'; },
+  };
+  if (chartEur) chartEur.destroy();
+  chartEur = new Chart(document.getElementById('chart-eur'), { type: 'scatter', data: { datasets }, options: opts });
+}
+
+function renderCurvasTablas() {
+  const u = cvEurU();
+  const coh = curvasData.cohortes[cvV] || [];
+  const eurKm = r => r.eur_km == null ? '—' : `<span${r.eur_con_km != null ? ` title="EUR P50 de esos mismos pozos con rama: ${cvEur(r.eur_con_km)} ${u}"` : ''}>` +
+    cvEur(r.eur_km) + (r.n_km != null ? ` <span style="color:var(--text-mute)">(n ${fmtNum(r.n_km)})</span>` : '') + '</span>';
+  const tipValida = 'Pozos que entran en la mediana de EUR: con ajuste aceptado (EUR = acumulada + pronóstico) ' +
+    'y pozos parados (EUR = acumulada real, sin pronóstico).';
+  document.getElementById('cv-coh').innerHTML =
+    `<tr><th>Cohorte</th><th>Pozos</th><th title="${tipValida}">Con EUR válida</th><th>Rama mediana (m)</th><th>EUR P50 (${u})</th>` +
+    `<th>EUR/km (${u}/km)</th><th>Meses de historia</th></tr>` +
+    coh.map(r => {
+      const gris = r.meses != null && r.meses < 24;
+      return `<tr class="${gris ? 'gris' : ''}"${gris ? ' title="Mayormente pronóstico: menos de 24 meses de historia"' : ''}>` +
+        `<td>${r.cohorte}${gris ? ' *' : ''}</td><td>${fmtNull(r.n)}</td><td>${fmtNull(r.n_ajuste)}</td><td>${fmtNull(r.rama)}</td>` +
+        `<td class="${gris ? '' : 'hi'}">${cvEur(r.eur)}</td><td>${eurKm(r)}</td><td>${fmtNull(r.meses)}</td></tr>`;
+    }).join('');
+  document.getElementById('cv-coh-nota').textContent =
+    `Medianas. EUR = acumulada real + pronóstico` + (cvV === 'g' ? ' (gas en MMm³ = millones de m³)' : '') + `. * En gris: cohortes con menos de 24 meses de historia (mediana): ` +
+    `su EUR es mayormente pronóstico.` + (coh.some(r => r.n_km != null) ? ' EUR/km: entre paréntesis, pozos con EUR válida y rama conocida (pasá el mouse para ver su EUR P50).' : '');
+  const emp = (curvasData.empresas[cvV] || []).slice()
+    .sort((a, b) => (b.eur_km == null ? -1 : b.eur_km) - (a.eur_km == null ? -1 : a.eur_km));
+  const conMeses = emp.some(e => e.meses != null);
+  document.getElementById('cv-emp-sub').textContent =
+    `Ordenados por EUR/km (medianas). Filtro: ${curvasData.empresas_filtro}.`;
+  document.getElementById('cv-emp').innerHTML =
+    `<tr><th>Operador</th><th>Pozos</th><th>Desde</th><th>Rama (m)</th><th>EUR (${u})</th><th>EUR/km (${u}/km)</th>` +
+    (conMeses ? '<th>Meses</th>' : '') + '</tr>' +
+    emp.map(e => `<tr${e.meses != null && e.meses < 24 ? ' class="gris" title="Historia corta: EUR mayormente pronóstico"' : ''}>` +
+      `<td>${empCorta(e.empresa)}${e.meses != null && e.meses < 24 ? ' <span style="color:#f0c040">· historia corta</span>' : ''}</td><td>${fmtNull(e.n)}</td><td>${e.desde ?? '—'}</td><td>${fmtNull(e.rama)}</td>` +
+      `<td>${cvEur(e.eur)}</td><td class="hi">${cvEur(e.eur_km)}</td>` + (conMeses ? `<td>${fmtNull(e.meses)}</td>` : '') + '</tr>').join('');
+  const fuera = (curvasData.empresas_fuera && curvasData.empresas_fuera[cvV]) || [];
+  document.getElementById('cv-emp-fuera').textContent = fuera.length
+    ? `Fuera del ranking por historia corta (mediana < ${curvasData.meses_empresa_min ?? '—'} meses): ` +
+      fuera.map(e => `${empCorta(e.empresa)} (${fmtNum(e.n)} pozos, ${fmtNull(e.meses)} meses)`).join(' · ') + '.'
+    : '';
+}
+
+function renderSupuestos() {
+  const d = curvasData, lim = d.limite || {};
+  const pct = x => fmtDec(x * 100, Number.isInteger(x * 100) ? 0 : 1);
+  document.getElementById('cv-supuestos').innerHTML = `Todo lo que no es producción medida es <b>pronóstico</b>:
+    <ul>
+      <li>Ajuste Arps hiperbólico modificado sobre el caudal diario desde el pico de los primeros 12 meses,
+        con b ≤ ${fmtDec(d.b_max, 1)}${d.b_max_joven != null ? ` (≤ ${fmtDec(d.b_max_joven, 1)} en pozos jóvenes, con menos de
+        ${fmtNum(d.meses_joven)} meses desde el pico)` : ''}; pasa a exponencial cuando la declinación baja a ${pct(d.dmin_anual)} %/año (Dmin).</li>
+      <li>Vida del pozo: ${fmtNum(d.vida_meses / 12)} años desde el arranque o hasta el límite económico
+        (${fmtDec(lim.p ?? 1, 0)} m³/d de petróleo, ${fmtDec(lim.g ?? 1, 0)} Mm³/d de gas).</li>
+      <li>Ajustes con r² < ${fmtDec(d.r2_min, 1)} se descartan (EUR = acumulada real, fuera de las medianas).</li>
+      ${d.esc_rango ? `<li>Si el primer mes de pronóstico se aparta de la mediana de los últimos 3 meses con producción
+        (fuera de ${fmtDec(d.esc_rango[0], 1)}–${fmtDec(d.esc_rango[1], 1)} veces), se reescala para empalmar` +
+        (d.emp_rango ? `; si se aparta más (fuera de ${fmtDec(d.emp_rango[0], 1)}–${fmtDec(d.emp_rango[1], 1)} veces),
+        no se pronostica (motivo «empalme»)` : '') + '.</li>' : ''}
+      <li>EUR = acumulada real + pronóstico. P10 = optimista y P90 = conservador (convención de reservas).
+        Gas: caudales en Mm³/mes (miles de m³); acumuladas y EUR en MMm³ (millones de m³).</li>
+      <li>${supMedianas(d)}</li>
+      <li>La curva tipo acumulada es la suma acumulada de los percentiles mensuales (P50 mes a mes), no el
+        percentil de las acumuladas de cada pozo. Por eso las bandas P10/P90 acumuladas son extremos
+        (ningún pozo es P10 todos los meses) y la acumulada P50 no coincide con la EUR P50 de la tabla.</li>
+      <li>El gráfico de declinación del popup de cada pozo muestra unos 10 años desde el arranque; la EUR suma
+        el pronóstico completo (hasta ${fmtNum(d.vida_meses / 12)} años o el límite económico), que el texto del popup indica.</li>
+      <li>Ventana de gas: GOR de los primeros 12 meses mayor a ${fmtNum(d.gor_gas)} m³/m³. Ramas menores a
+        ${fmtNum(d.rama_min_m)} m se toman como dato mal cargado.</li>
+      <li>Datos de producción hasta ${d.ultimo} (último mes completo del Cap. IV).</li>
+    </ul>`;
+}
+
+// Qué pozos entran en las medianas de EUR (curvas.json -> mediana_motivos, si existe)
+function supMedianas(d) {
+  const MOT = { ok: 'ajuste aceptado (EUR = acumulada + pronóstico)', parado: 'parados (EUR = acumulada)',
+    parado_reciente: 'parados hace poco (EUR = acumulada)', corto: 'historia corta', dmin: 'declinación menor a la terminal',
+    r2: 'ajuste pobre (r²)', poco_vol: 'acumulada muy chica', empalme: 'el ajuste no empalma con la producción reciente' };
+  const todos = ['ok', 'parado', 'parado_reciente', 'corto', 'dmin', 'r2', 'poco_vol', 'empalme'];
+  const dentro = Array.isArray(d.mediana_motivos) && d.mediana_motivos.length ? d.mediana_motivos : ['ok', 'parado', 'parado_reciente'];
+  const extra = Object.keys((curvasPozos && curvasPozos.motivos) || {}).filter(k => !todos.includes(k));
+  const fuera = todos.concat(extra).filter(k => !dentro.includes(k));
+  const nom = k => `${MOT[k] || k} («${k}»)`;
+  return `Entran en las medianas de EUR (tablas y gráfico de dispersión, columna «Con EUR válida»): ` +
+    dentro.map(nom).join(', ') + `. Quedan afuera (su EUR = acumulada se muestra en el popup del pozo, pero no cuenta): ` +
+    fuera.map(nom).join(', ') + '.';
+}
+
+// ── Popup: sección Declinación (pozos NC de curvas_pozos.json) ───────────────
+function declPlaceholder(r) {
+  const id = r[I.id];
+  if (curvasPozos) return curvasPozos.pozos[id] ? `<div class="decl-box" data-id="${id}"></div>` : '';
+  return (r[I.tr] || '').toUpperCase().includes('NO CONV') ? `<div class="decl-box" data-id="${id}"></div>` : '';
+}
+
+// Hiperbólica modificada (t en meses desde el pico) → caudal diario
+function arpsMod(t, qi, di, b, dminAnual) {
+  const dmin = -Math.log(1 - dminAnual) / 12;
+  const tsw = di > dmin ? (di / dmin - 1) / (b * di) : 0;
+  if (t < tsw) return qi / Math.pow(1 + b * di * t, 1 / b);
+  const qsw = qi / Math.pow(1 + b * di * tsw, 1 / b);
+  return qsw * Math.exp(-dmin * (t - tsw));
+}
+
+// Texto del motivo sin la parte que ya dice la línea ("pronóstico 0", "sin pronóstico, EUR = acumulada")
+function motivoCorto(m) {
+  return String(m).replace(/\s*[:,;]\s*(sin pronóstico|pronóstico 0|no se ajusta|EUR = acumulada).*$/i, '')
+    .replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/</g, '&lt;').replace(/>/g, '&gt;').trim();
+}
+const fmtAnio = a => fmtDec(a, Number.isInteger(a) ? 0 : 1);
+// r² del ajuste por debajo de esto: aviso ámbar de ajuste pobre (solo aviso, no cambia la EUR)
+const R2_POBRE = 0.6;
+// Color del ajuste: gris neutro, contrasta con el real (naranja petróleo / celeste gas) y el pronóstico violeta
+const COLOR_AJUSTE = '#555';
+
+function fillDecl(box, popup) {
+  loadCurvasPozos().then(cp => {
+    if (!box.isConnected) return;
+    const z = cp.pozos[box.dataset.id];
+    if (!z) { box.remove(); return; }
+    const v = z.v === 'g' ? 'g' : 'p';
+    const u = v === 'p' ? 'm³' : 'Mm³';
+    const fmtQ = v === 'p' ? fmtNum : fmtGasMes;
+    const serie = z[v] || [];
+    const fit = z['f' + v], q = z['q' + v], eurV = z['e' + v];
+    const acum = serie.reduce((a, b) => a + b, 0);
+    const marca = k => !!(z[k + v] || z[k]);
+    const joven = marca('j'), esc = marca('esc');
+    const lim = (cp.limite && cp.limite[v]) || 0;
+    // Meses en 0 o con producción residual (pozo cerrado, < 1 m³ o 1 Mm³) = hueco, no caída vertical en log
+    const resid = (cp.residual && cp.residual[v] != null) ? cp.residual[v] : 0;
+    const conProd = x => x > 0 && x >= resid;
+    const real = serie.map((x, i) => ({ x: i / 12, y: conProd(x) ? x : null }));
+    const datasets = [{ label: 'real', data: real, borderColor: v === 'p' ? '#e07020' : '#2e86c1',
+      borderWidth: 2, pointRadius: 0, spanGaps: false }];
+    let txt, r2Pobre = null, alcance = '', xMax = Math.max(2, Math.ceil(serie.length / 24) * 2);
+    if (q === 'ok' && fit) {
+      // fit = [qi_pron, Di, b, pico, r2, qi_ajuste]: la historia se dibuja con qi_ajuste, el pronóstico con qi_pron
+      const [qiPron, di, b, pico, r2] = fit;
+      if (r2 != null && isFinite(r2) && r2 < R2_POBRE) r2Pobre = r2;
+      const qiAj = fit.length > 5 && fit[5] != null ? fit[5] : qiPron;
+      const n = serie.length;
+      const vida = cp.vida_meses || 360;
+      const horiz = Math.min(Math.max(120, n + 36), vida);
+      const mens = (k, qi) => arpsMod(k - pico, qi, di, b, cp.dmin_anual) * DIAS_MES;
+      // Fin del pronóstico que suma la EUR: límite económico o vida del pozo (mismo criterio que el preprocesado)
+      let kFin = n;
+      while (kFin < vida && mens(kFin, qiPron) / DIAS_MES >= lim) kFin++;
+      const ajuste = [], pron = [];
+      for (let k = pico; k < n; k++) ajuste.push({ x: k / 12, y: mens(k, qiAj) });
+      for (let k = n; k < Math.min(horiz, kFin); k++) pron.push({ x: k / 12, y: mens(k, qiPron) });
+      xMax = Math.max(10, Math.ceil(horiz / 24) * 2);
+      if (ajuste.length) datasets.push({ label: 'ajuste', data: ajuste, borderColor: COLOR_AJUSTE,
+        borderWidth: 1.4, pointRadius: 0 });
+      // Empalme visual: tramo punteado (color y grosor del pronóstico) desde el último mes real con producción
+      // al primer mes de pronóstico
+      let kUlt = n - 1;
+      while (kUlt >= 0 && !conProd(serie[kUlt])) kUlt--;
+      if (pron.length && kUlt >= 0) datasets.push({ label: 'empalme', data: [{ x: kUlt / 12, y: serie[kUlt] }, pron[0]],
+        borderColor: '#8e44ad', borderWidth: 2.2, borderDash: [3, 3], pointRadius: 0, _empalme: true });
+      if (pron.length) datasets.push({ label: 'pronóstico', data: pron, borderColor: '#8e44ad',
+        borderWidth: 2.6, borderDash: [7, 4], pointRadius: 0 });
+      const De = 1 - Math.pow(1 + 12 * b * di, -1 / b);
+      const resto = Math.max(0, eurV - acum);
+      const q1 = n >= pico ? mens(n, qiPron) : null;
+      const aFin = Math.round(kFin / 12 * 10) / 10;
+      const ajusteTxt = `b ${fmtDec(b, 2)}${joven ? ' (pozo joven: b limitado)' : ''} · ` +
+        `declina ${fmtDec(De * 100, 0)} % el primer año · r² ${fmtDec(r2, 2)}`;
+      if (!pron.length) {
+        // El primer mes ya está bajo el límite económico: no hay pronóstico, EUR = acumulada
+        const q0 = mens(n, qiPron);
+        txt = `Sin pronóstico: el primer mes (${isFinite(q0) ? fmtQ(q0) : '—'} ${u}/mes) ya está bajo el límite económico ` +
+          `(${fmtDecMax(lim, 2)} ${u}/d). EUR = acumulada = ${fmtEurU(eurV != null ? eurV : acum, v)}` +
+          ` <span class="nota">· ajuste: ${ajusteTxt}</span>`;
+      } else {
+        alcance = aFin > xMax
+          ? `El gráfico muestra hasta el año ${fmtAnio(xMax)}; el pronóstico sigue hasta el año ${fmtAnio(aFin)} (límite económico o ${fmtNum(vida / 12)} años).`
+          : `El gráfico muestra hasta el año ${fmtAnio(xMax)}; el pronóstico termina en el año ${fmtAnio(aFin)} (límite económico).`;
+        txt = `EUR ${fmtEurU(eurV, v)} = ${fmtEurU(acum, v)} acumulados + ${fmtEurU(resto, v)} pronóstico · ` + ajusteTxt +
+          (q1 != null && isFinite(q1) ? ` <span class="nota">· primer mes de pronóstico: ${fmtQ(q1)} ${u}/mes</span>` : '') +
+          `<span class="alcance">${alcance}</span>`;
+      }
+    } else {
+      const motivo = motivoCorto((cp.motivos && cp.motivos[q]) || q || 'sin ajuste');
+      txt = `Sin pronóstico (${motivo}). EUR = acumulada = ${fmtEurU(eurV != null ? eurV : acum, v)}`;
+    }
+    const av = cp.avisos || {};
+    const avisos = [];
+    if (q === 'ok' && joven) avisos.push(av['j' + v] || 'pozo joven: b limitado');
+    if (q === 'ok' && esc) avisos.push(av['esc' + v] || 'pronóstico reescalado para empalmar con el último dato real');
+    if (z.rq) avisos.push(av.rq || 'rama posiblemente redondeada');
+    if (marca('rea')) avisos.push(av['rea' + v] || 'pozo reactivado en los últimos 12 meses: pronóstico incierto');
+    if (avisos.length) txt += avisos.map(a => `<br><span class="aviso">⚠ ${a}</span>`).join('');
+    if (r2Pobre != null) txt += `<br><span class="aviso ambar">⚠ ajuste pobre (r² ${fmtDec(r2Pobre, 2)}): el pronóstico es poco confiable</span>`;
+    box.innerHTML = `<div class="spark-label" style="margin-top:8px">Declinación · ${v === 'p' ? 'petróleo' : 'gas'} ` +
+      `${u}/mes (escala log) · arranque ${z.s}</div>` +
+      `<div style="position:relative;height:240px;width:270px"><canvas></canvas></div><div class="decl-txt">${txt}</div>`;
+    if (declChart) { declChart.destroy(); declChart = null; }
+    const F = { size: 13 };
+    declChart = new Chart(box.querySelector('canvas'), {
+      type: 'line', data: { datasets },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+        plugins: {
+          legend: { labels: { usePointStyle: true, pointStyle: 'line', pointStyleWidth: 30, color: '#1a2533', padding: 8, font: F,
+            filter: it => it.text !== 'empalme' } },
+          tooltip: { filter: it => !it.dataset._empalme,
+            callbacks: { title: it => it.length ? `Año ${fmtDec(it[0].raw.x, 1)}` : '',
+            label: c => `${c.dataset.label}: ${fmtQ(c.raw.y)} ${u}/mes` } },
+        },
+        scales: {
+          x: { type: 'linear', min: 0, max: xMax,
+               ticks: { stepSize: 2, color: '#3a4a5e', font: F }, grid: { color: '#e3e7ee' },
+               title: { display: true, text: 'años desde el arranque', color: '#3a4a5e', font: F } },
+          y: { type: 'logarithmic',
+               ticks: { color: '#3a4a5e', font: F, autoSkip: false,
+                 callback: function (val) { return tickLogCon(val, v === 'p' ? fmtCorto : fmtGasMes, this); } },
+               grid: { color: '#e3e7ee' } },
+        },
+      },
+    });
+    const reubicar = () => { try { if (popup.isOpen()) { limitarAltoPopup(popup); popup._updatePosition(); popup._adjustPan(); } } catch (e) { } };
+    reubicar();
+  }).catch(() => { if (box.isConnected) box.remove(); });
+}
+
+// Popups más altos que el mapa: alto máximo con scroll, así el autopan los puede mostrar enteros
+function limitarAltoPopup(popup) {
+  const h = map.getSize().y - 120;
+  if (h > 200 && popup.options.maxHeight !== h) popup.options.maxHeight = h;
+  popup._updateLayout();
+}
+map.on('popupopen', e => {
+  const ajustar = () => { try { if (e.popup.isOpen()) { limitarAltoPopup(e.popup); e.popup._updatePosition(); e.popup._adjustPan(); } } catch (err) { } };
+  ajustar();
+  // flyToPozo abre el popup al empezar el vuelo y el vuelo anula el autopan: reajustar al terminar
+  map.on('moveend', ajustar);
+  setTimeout(() => map.off('moveend', ajustar), 2500);
+  const el = e.popup.getElement();
+  const box = el && el.querySelector('.decl-box');
+  if (box) fillDecl(box, e.popup);
+});
+map.on('popupclose', () => { if (declChart) { declChart.destroy(); declChart = null; } });
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function fmtNum(n) { return (n||0).toLocaleString('es-AR', { maximumFractionDigits: 0 }); }
