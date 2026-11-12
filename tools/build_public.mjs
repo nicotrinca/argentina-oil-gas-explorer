@@ -29,6 +29,8 @@ const FIJOS = [
   "data/geo_qa.json",
   "data/curvas.json",
   "data/curvas_pozos.json",
+  "data/zonas.json",
+  "data/interferencia.json",
 ];
 
 // data/pozos_${yr}.js: un archivo por cada año del selector #f-year de index.html.

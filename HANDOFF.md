@@ -67,6 +67,12 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
      ≥ 15 pozos, historia mediana ≥ 12 meses (los demás en `empresas_fuera`).
    - Valores de referencia (VM, 2026-11): EUR mediana petróleo 2019–2024 ≈ 112–138 mil m³ (≈ 0,8 MMbbl),
      45–63 mil m³/km; gas 2021–2024 ≈ 370–420 MMm³, 137–163 MMm³/km.
+7. `preprocess_zonas.py` (después de curvas; lee curvas_pozos.json/curvas.json + coordenada/concesión del CSV NC, ~10 s)
+   → `zonas.json` (GeoJSON de hexágonos de 3 km entre lados planos + tabla `concesiones`, 0,13 MB) e
+   `interferencia.json` (padre/hijo por pozo en `pozos` + estadísticas, 0,08 MB). Esquema en el docstring.
+   Solo hay coordenada de SUPERFICIE: todo es zonal (la rama de 2–3 km puede estar en otro hexágono).
+   Cifra principal: ratio hijo/padre de acum. 12 meses/km dentro de cada hexágono con ≥ 3 padres y ≥ 3 hijos
+   (2026-11: petróleo ≈ 1,02 en 55 hexágonos; gas ≈ 0,90 en 18).
 
 ## Reglas del dominio (no negociables)
 - **La clave de pozo es `idpozo`, NUNCA la sigla.** La sigla no es única (85.380 idpozo vs 78.128 siglas;
@@ -95,6 +101,13 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
 - Popups de pozo: `className: 'pozo-popup'`; su `.leaflet-popup-content` es SIEMPRE el contenedor de scroll
   (si no, el encabezado sticky `.lf-popup-head` se engancha a `.leaflet-container` y aparece a mitad del popup).
 - Pestaña Curvas ensancha la barra lateral (`body.sb-wide`); `#tabs` hace wrap a 2 filas con barra angosta.
+- Capa "Zonas productivas VM": pane propio `zonas` (z 350, DEBAJO del canvas de puntos, `pointer-events:none`) y
+  hexágonos `interactive:false`. El canvas de puntos cubre todo el mapa y se come los clics, así que el popup del
+  hexágono sale de `map.on('click')` → `abrirZonaEn` (punto en polígono), salvo que el clic ya haya abierto otro popup
+  (contador `popupSeq` entre `preclick` y `click`). Con la capa prendida, `#map.zonas-on` deja los clusters al 50 %.
+  `zonas.json` lo comparten capa y pestaña Curvas
+  (`loadZonas`, promesa cacheada; `lazyGeo` acepta un tercer parámetro `load`). Rayado = `<pattern id="zonas-rayado">`.
+- `interferencia.json` (`loadInterf`) lo usan la pestaña Curvas y la línea padre/hijo de `fillDecl`.
 - `curvas_pozos.json` (3 MB) se baja una sola vez (`loadCurvasPozos`, promesa cacheada) al abrir un popup NC o la pestaña.
 - Gas: barras del popup y `sparklines.json` ya vienen en Mm³ (no dividir por 1000; bug corregido 2026-11-11).
   En Curvas y textos de EUR el gas se muestra en MMm³.
@@ -114,6 +127,10 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
   `.catch` de ranking.json, aviso ámbar de ajuste pobre (r² < 0,6). check.mjs: 30 chequeos.
 - 2026-11-11: publicado en Firebase Hosting (pozos-argentina.web.app): `tools/build_public.mjs`, `firebase.json`
   con predeploy, `.firebaserc`; línea de atribución a la Secretaría de Energía (CC-BY 4.0) en el encabezado.
+
+- 2026-11-12: zonas productivas VM (hexágonos por EUR/km, tabla por concesión) e interferencia padre/hijo
+  (`preprocess_zonas.py`, sección al final de Curvas, línea en el popup). Revisión: clic en pozos con la capa
+  prendida, clusters translúcidos, sensibilidad hijo ≥ 12 meses. check.mjs: 35 chequeos.
 
 ## Pendiente conocido
 - Concesiones solapadas: LOMA LA LATA - SIERRA BARROSA y LA ANGOSTURA SUR I salen con los mismos 57 pozos.

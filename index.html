@@ -254,6 +254,27 @@
   .supuestos { background: #14171f; border: 1px solid #2a3046; border-radius: 9px; padding: 12px 14px;
     font-size: 14px; color: var(--text-dim); line-height: 1.55; }
   .supuestos ul { margin: 4px 0 0 18px; }
+  /* Interferencia padre/hijo (pestaña Curvas) */
+  .int-cifra { background: #14171f; border: 1px solid #2a3046; border-left: 4px solid var(--accent);
+    border-radius: 9px; padding: 12px 14px; font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+  .int-cifra .big { font-size: 30px; font-weight: 700; color: var(--accent); line-height: 1.15; }
+  .int-cifra .sec { color: var(--text); font-size: 15px; opacity: .85; margin-top: 4px; }
+  .int-aviso { font-size: 14px; color: #f0c040; font-weight: 600; }
+  #int-met { flex-wrap: wrap; }
+  #cv-conc th[data-k] { cursor: pointer; }
+  #cv-conc th:nth-child(2), #cv-conc td:nth-child(2) { text-align: left; white-space: normal; }
+  #cv-conc th[data-k].orden { color: var(--accent); }
+  /* Leyenda de zonas VM (hexágonos) */
+  .zonas-leg { max-width: 260px; font-size: 14px; }
+  .zonas-leg .seg { margin-bottom: 8px; }
+  .zonas-leg .seg .metric-btn { padding: 6px 10px; font-size: 14px; }
+  .zonas-leg .sw { width: 22px; height: 14px; border-radius: 2px; flex-shrink: 0; border: 1px solid #0006; }
+  .zonas-leg .nota { color: var(--text-mute); margin-top: 6px; line-height: 1.35; }
+  .zona-nota { font-size: 14px; color: #5a6b7e; margin-top: 6px; line-height: 1.4; }
+  /* Con la capa de zonas prendida, los clusters (círculos con número) dejan ver los hexágonos */
+  #map.zonas-on .leaflet-marker-pane .leaflet-marker-icon > div { opacity: .5; transition: opacity .15s; }
+  #map.zonas-on .leaflet-marker-pane .leaflet-marker-icon:hover > div { opacity: 1; }
+  #tab-curvas .int-pie { color: var(--text-dim); }
   @media (max-width: 760px) {
     body.sb-wide #sidebar { width: 100vw; min-width: 0; }
   }
@@ -273,6 +294,8 @@
   .decl-txt .nota { color: #5a6b7e; }
   .decl-txt .aviso { color: #c0392b; font-weight: 600; }
   .decl-txt .aviso.ambar { color: #9a6200; }
+  .decl-txt .ph { display: block; margin-top: 4px; color: #1a2533; }
+  .decl-txt .ph b { color: #103a5f; }
 
   /* ── Botón en popup ── */
   .popup-btn {
@@ -517,12 +540,46 @@ if (location.protocol === 'file:') document.addEventListener('DOMContentLoaded',
     <div style="overflow-x:auto"><table class="geo-table" id="cv-emp"></table></div>
     <div class="geo-note" id="cv-emp-fuera"></div>
 
+    <div class="section-title">Por concesión</div>
+    <div class="geo-note int-pie" id="cv-conc-sub"></div>
+    <div style="overflow-x:auto"><table class="geo-table" id="cv-conc"></table></div>
+
     <div class="section-title">Supuestos</div>
     <div class="supuestos" id="cv-supuestos"></div>
+
+    <div class="section-title" style="margin-top:16px">Interferencia entre pozos (padre/hijo)</div>
+    <div class="int-aviso">Exploratorio: correlación, no causa. Ubicación por coordenada de superficie (la rama puede
+      extenderse 2–3 km).</div>
+    <div class="int-cifra" id="int-cifra">Cargando…</div>
+    <div class="curvas-ctrl">
+      <div class="seg" id="int-met">
+        <button class="metric-btn active" data-m="a">Acum. 12 meses/km (real)</button>
+        <button class="metric-btn" data-m="e">EUR/km (pronóstico)</button>
+      </div>
+    </div>
+    <div class="curvas-grid">
+      <div class="chart-wrap">
+        <div class="chart-label" id="int-t1">Padres vs. hijos por cohorte</div>
+        <div class="curvas-box"><canvas id="chart-int-coh"></canvas></div>
+        <div class="geo-note int-pie" id="int-n1"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-label" id="int-t2">Hijos según la edad del vecino más viejo</div>
+        <div class="curvas-box"><canvas id="chart-int-tramo"></canvas></div>
+        <div class="geo-note int-pie" id="int-n2"></div>
+      </div>
+    </div>
+    <div class="supuestos" id="int-supuestos"></div>
   </div>
 </div>
 
 <div id="map"></div>
+<!-- Rayado para hexágonos con pocos pozos (capa Zonas productivas VM): fill="url(#zonas-rayado)" -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <pattern id="zonas-rayado" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="8" height="8" fill="#6b7590"/><rect width="3.5" height="8" fill="#d0d6e2"/>
+  </pattern>
+</defs></svg>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -627,13 +684,14 @@ function clearAreaFilter() {
 }
 
 // ── Capas geo (preprocess_geo.py): se descargan recién al prenderlas ───────
-function lazyGeo(url, opts) {
+// load (opcional): función que devuelve una promesa con el GeoJSON (para compartir la descarga con otra vista)
+function lazyGeo(url, opts, load) {
   const lyr = L.geoJSON(null, opts);
   let loaded = false;
   lyr.on('add', () => {
     if (loaded) return;
     loaded = true;
-    fetch(url).then(r => r.json()).then(d => lyr.addData(d)).catch(() => { loaded = false; });
+    (load ? load() : fetch(url).then(r => r.json())).then(d => lyr.addData(d)).catch(() => { loaded = false; });
   });
   return lyr;
 }
@@ -674,10 +732,142 @@ const permLayer = lazyGeo('data/permisos.geojson', {
     (p.socios ? `<div style="font-size:12px;color:#5a6b7e">${p.socios}</div>` : '')); },
 });
 
+// ── Zonas productivas VM (preprocess_zonas.py): hexágonos coloreados por mediana de EUR/km ──
+// zonas.json lo comparten la capa y la pestaña Curvas (tabla por concesión): una sola descarga.
+let zonasP = null, zonasData = null, zonasV = 'p';
+const ZONAS_PAL = { p: ['#fee391', '#fec44f', '#fe9929', '#ec7014', '#b84a02'],
+                    g: ['#d9f99d', '#86efac', '#2dd4bf', '#38bdf8', '#818cf8'] };
+const zonasCortes = { p: [], g: [] };
+// Valores por km: petróleo en mil m³/km, gas en MMm³/km (los JSON traen m³/km y Mm³/km). Siempre 1 decimal,
+// así los rangos ("35,4 – 79,4") tienen el mismo formato en los dos extremos
+const fmtZona = (v, fl) => v == null ? '—' : fmtDec(v / 1000, 1);
+const uZona = fl => fl === 'p' ? 'mil m³/km' : 'MMm³/km';
+function loadZonas() {
+  if (!zonasP) zonasP = fetch('data/zonas.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => {
+      // Cortes por quintiles de los hexágonos con color (redondeados a 2 cifras significativas)
+      for (const fl of ['p', 'g']) {
+        const vals = d.features.map(f => f.properties[fl]).filter(p => p && !p.pocos && p.e != null).map(p => p.e).sort((a, b) => a - b);
+        const redo = x => { const k = Math.pow(10, Math.floor(Math.log10(x)) - 1); return Math.round(x / k) * k; };
+        zonasCortes[fl] = vals.length >= 5 ? [0.2, 0.4, 0.6, 0.8].map(q => redo(vals[Math.floor(q * (vals.length - 1))])) : [];
+      }
+      return (zonasData = d);
+    })
+    .catch(e => { zonasP = null; throw e; });
+  return zonasP;
+}
+function zonaColor(e, fl) {
+  const c = zonasCortes[fl], pal = ZONAS_PAL[fl];
+  let i = 0; while (i < c.length && e >= c[i]) i++;
+  return pal[Math.min(i, pal.length - 1)];
+}
+function zonaStyle(f) {
+  const p = f.properties[zonasV];
+  // setStyle mezcla opciones: cada estilo define todas (stroke, fill, dashArray) para no arrastrar las del otro
+  if (!p) return { stroke: false, fill: false, dashArray: null };
+  if (p.pocos || p.e == null) return { stroke: true, fill: true, color: '#c3cad8', weight: 1.2, dashArray: '3 3',
+    fillColor: 'url(#zonas-rayado)', fillOpacity: 0.6 };
+  return { stroke: true, fill: true, color: '#1b1f2b', weight: 0.8, dashArray: null,
+    fillColor: zonaColor(p.e, zonasV), fillOpacity: 0.58 };
+}
+function zonaPopupHTML(f) {
+  const fl = zonasV, p = f.properties[fl], otro = f.properties[fl === 'p' ? 'g' : 'p'];
+  const nomF = fl === 'p' ? 'petróleo' : 'gas', u = uZona(fl);
+  if (!p) return '';
+  const filas = [
+    ['Pozos con EUR/km', fmtNum(p.n) + (p.pocos ? ' <span style="color:#9a6200">(pocos pozos)</span>' : '')],
+    ['EUR/km mediana', p.e != null ? `${fmtZona(p.e, fl)} ${u}` : '—'],
+    ['EUR/km rango P90–P10', p.e10 != null ? `${fmtZona(p.e90, fl)} – ${fmtZona(p.e10, fl)} ${u}<br><span style="font-weight:400;color:#5a6b7e">P90 conservador – P10 optimista</span>`
+      : `— (menos de ${(zonasData && zonasData.meta.min_n_hex) || 3} pozos)`],
+    ['Acum. 12 meses/km', p.a != null ? `${fmtZona(p.a, fl)} ${u} (n ${fmtNum(p.na)})` : '— (ningún pozo con 12 meses)'],
+    ['Cohortes', p.c ? (p.c[0] === p.c[1] ? String(p.c[0]) : `${p.c[0]}–${p.c[1]}`) : '—'],
+    ['Operadores', (p.o || []).map(([e, n]) => `${empCorta(e)} (${n})`).join('<br>')],
+  ];
+  return `<div class="lf-popup-head"><div class="lf-popup-empresa">Zona Vaca Muerta · ${nomF}</div>
+      <div class="lf-popup-sub">Hexágono de ${fmtDecMax(((zonasData && zonasData.meta.hex_ancho_m) || 3000) / 1000, 1)} km · pozos horizontales</div></div>` +
+    popupGrid(filas) +
+    `<div class="zona-nota">EUR = acumulada real + pronóstico. Acum. 12 meses = dato real.` +
+    (otro && otro.n > 0 ? ` En este hexágono hay además ${fmtNum(otro.n)} pozo${otro.n === 1 ? '' : 's'} de ${fl === 'p' ? 'gas' : 'petróleo'} con EUR/km.` : '') + `</div>` +
+    `<div class="zona-nota"><b>Ubicación por coordenada de superficie; la rama puede extenderse 2–3 km.</b></div>`;
+}
+// Pane propio DEBAJO del canvas de pozos (overlayPane 400): los puntos se dibujan encima de los hexágonos.
+// Hexágonos no interactivos (pointer-events: none): el canvas de puntos ocupa todo el mapa y se come los clics,
+// así que el popup del hexágono se abre desde map.on('click') con punto en polígono (abrirZonaEn).
+const zonasPane = map.createPane('zonas');
+zonasPane.style.zIndex = 350;
+zonasPane.style.pointerEvents = 'none';
+const zonasLayer = lazyGeo('data/zonas.json', { pane: 'zonas', style: zonaStyle, interactive: false }, loadZonas);
+// Hexágono del fluido elegido que contiene (lat, lng), o null
+function zonaEn(lat, lng) {
+  for (const l of zonasLayer.getLayers()) {
+    const f = l.feature;
+    if (f.properties[zonasV] && pointInPolygon(lng, lat, f.geometry.coordinates)) return f;
+  }
+  return null;
+}
+function abrirZonaEn(latlng) {
+  const f = zonaEn(latlng.lat, latlng.lng);
+  if (!f) return false;
+  L.popup({ maxWidth: 300, className: 'pozo-popup' }).setLatLng(latlng).setContent(zonaPopupHTML(f)).openOn(map);
+  return true;
+}
+// Si el clic abrió el popup de un pozo (u otra capa), no abrir el del hexágono: se compara el contador de
+// popups abiertos entre 'preclick' y 'click' (las capas disparan su clic antes que el mapa)
+let popupSeq = 0, popupSeqPre = 0;
+map.on('popupopen', () => { popupSeq++; });
+map.on('preclick', () => { popupSeqPre = popupSeq; });
+map.on('click', e => {
+  if (!map.hasLayer(zonasLayer) || popupSeq !== popupSeqPre) return;
+  abrirZonaEn(e.latlng);
+});
+const zonasLegend = L.control({ position: 'bottomright' });
+zonasLegend.onAdd = () => {
+  const d = L.DomUtil.create('div', 'legend zonas-leg');
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.disableScrollPropagation(d);
+  renderZonasLegend(d);
+  d.addEventListener('click', e => {
+    const b = e.target.closest('[data-zv]');
+    if (!b || b.dataset.zv === zonasV) return;
+    zonasV = b.dataset.zv;
+    zonasLayer.setStyle(zonaStyle);
+    map.closePopup();
+    renderZonasLegend(d);
+  });
+  return d;
+};
+function renderZonasLegend(d) {
+  const fl = zonasV, c = zonasCortes[fl], pal = ZONAS_PAL[fl], u = uZona(fl);
+  const rangos = c.length ? pal.map((col, i) => {
+    const t = i === 0 ? `< ${fmtZona(c[0], fl)}` : i === c.length ? `≥ ${fmtZona(c[i - 1], fl)}` : `${fmtZona(c[i - 1], fl)} – ${fmtZona(c[i], fl)}`;
+    return `<div class="legend-item"><div class="sw" style="background:${col}"></div>${t}</div>`;
+  }).join('') : '<div class="legend-item">Cargando…</div>';
+  d.innerHTML = `<h4>Zonas VM · EUR/km mediana</h4>
+    <div class="seg"><button class="metric-btn${fl === 'p' ? ' active' : ''}" data-zv="p">Petróleo</button>` +
+    `<button class="metric-btn${fl === 'g' ? ' active' : ''}" data-zv="g">Gas</button></div>
+    <div style="margin-bottom:4px">${u}</div>${rangos}
+    <div class="legend-item"><svg class="sw" width="22" height="14"><rect width="22" height="14" fill="url(#zonas-rayado)"/></svg>pocos pozos (< ${(zonasData && zonasData.meta.min_n_hex) || 3})</div>
+    <div class="nota">Por coordenada de superficie: la rama puede estar a 2–3 km.</div>`;
+}
+let zonasLegendEl = null;
+map.on('overlayadd', e => {
+  if (e.layer !== zonasLayer) return;
+  zonasLegend.addTo(map);
+  zonasLegendEl = zonasLegend.getContainer();
+  map.getContainer().classList.add('zonas-on');
+  loadZonas().then(() => { if (zonasLegendEl) renderZonasLegend(zonasLegendEl); }).catch(() => {});
+});
+map.on('overlayremove', e => {
+  if (e.layer !== zonasLayer) return;
+  zonasLegend.remove(); zonasLegendEl = null;
+  map.getContainer().classList.remove('zonas-on');
+});
+
 L.control.layers(
   { 'Oscuro': baseDark, 'Satélite': baseSat },
   { 'Áreas concesión': areasLayer, 'Cuencas sedimentarias': cuencasLayer, 'Yacimientos': yacLayer,
-    'Permisos de exploración': permLayer, 'Gasoductos troncales': gasodLayer, 'Refinerías': refiLayer },
+    'Permisos de exploración': permLayer, 'Gasoductos troncales': gasodLayer, 'Refinerías': refiLayer,
+    'Zonas productivas VM': zonasLayer },
   { position: 'topright', collapsed: false }
 ).addTo(map);
 
@@ -1566,6 +1756,9 @@ let curvasData = null, curvasBuilt = false, chartCurvas = null, chartEur = null;
 let cvV = 'p', cvModo = 'mensual', cvKm = false, cvLog = false;
 const cvSel = new Set();
 let curvasPozosP = null, curvasPozos = null, declChart = null;
+// Interferencia padre/hijo (interferencia.json, ~80 KB): la usan la pestaña Curvas y el popup VM
+let interfP = null, interfData = null, chartIntCoh = null, chartIntTramo = null, intMet = 'a';
+let concOrden = { k: 'e', asc: false };
 
 function fmtDec(n, d) {
   return (+n).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -1626,7 +1819,7 @@ let curvasCargando = false, cvListeners = false;
 
 function buildCurvasTab() {
   if (curvasBuilt) {
-    setTimeout(() => { if (chartCurvas) chartCurvas.resize(); if (chartEur) chartEur.resize(); }, 80);
+    setTimeout(() => { [chartCurvas, chartEur, chartIntCoh, chartIntTramo].forEach(c => { if (c) c.resize(); }); }, 80);
     return;
   }
   // Si la carga falla, curvasBuilt queda en false y se reintenta al volver a abrir la pestaña
@@ -1649,6 +1842,17 @@ function buildCurvasTab() {
       seg('cv-modo', b => { cvModo = b.dataset.modo; });
       seg('cv-km', b => { cvKm = b.dataset.km === '1'; });
       document.getElementById('cv-log').addEventListener('change', e => { cvLog = e.target.checked; renderCurvas(); });
+      document.querySelectorAll('#int-met .metric-btn').forEach(b => b.addEventListener('click', () => {
+        document.querySelectorAll('#int-met .metric-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active'); intMet = b.dataset.m; renderInterferencia();
+      }));
+      document.getElementById('cv-conc').addEventListener('click', e => {
+        const th = e.target.closest('th[data-k]');
+        if (!th) return;
+        const k = th.dataset.k;
+        concOrden = concOrden.k === k ? { k, asc: !concOrden.asc } : { k, asc: k === 'c' || k === 'o' };
+        renderConcesiones();
+      });
     }
     buildCvChips();
     renderCurvas();
@@ -1696,6 +1900,8 @@ function renderCurvas() {
   renderCurvasChart();
   renderEurChart();
   renderCurvasTablas();
+  renderConcesiones();
+  renderInterferencia();
 }
 
 function renderCurvasChart() {
@@ -1897,6 +2103,134 @@ function supMedianas(d) {
     fuera.map(nom).join(', ') + '.';
 }
 
+// ── Curvas: tabla por concesión (zonas.json) ───────────────────────────────
+function renderConcesiones() {
+  const tabla = document.getElementById('cv-conc'), sub = document.getElementById('cv-conc-sub');
+  loadZonas().then(z => {
+    const fl = cvV, u = uZona(fl), minN = z.meta.min_n_conc;
+    const filas = (z.concesiones[fl] || []).slice();
+    const { k, asc } = concOrden;
+    const val = r => k === 'c' || k === 'o' ? r[k] : (r[k] == null ? -Infinity : r[k]);
+    // Las concesiones con pocos pozos van siempre al final (gris)
+    filas.sort((a, b) => (!!a.pocos - !!b.pocos) ||
+      (k === 'c' || k === 'o' ? String(val(a)).localeCompare(String(val(b)), 'es') * (asc ? 1 : -1)
+                             : (asc ? val(a) - val(b) : val(b) - val(a))));
+    const th = (key, txt, tip) => `<th data-k="${key}"${key === k ? ' class="orden"' : ''}${tip ? ` title="${tip}"` : ''}>` +
+      `${txt}${key === k ? (asc ? ' ▲' : ' ▼') : ''}</th>`;
+    tabla.innerHTML = '<tr>' + th('c', 'Concesión') + th('o', 'Operador principal') +
+      th('n', 'Pozos con EUR', 'Pozos horizontales con EUR válida y rama conocida') + th('e', `EUR/km (${u})`) +
+      th('na', 'Pozos con 12 meses', 'Pozos con 12 meses o más de historia') + th('a', `Acum. 12 meses/km (${u})`) + '</tr>' +
+      filas.map(r => `<tr${r.pocos ? ` class="gris" title="Menos de ${minN} pozos con EUR/km"` : ''}>` +
+        `<td>${r.c}${r.pocos ? ' <span style="color:#f0c040">· pocos pozos</span>' : ''}</td><td>${empCorta(r.o || '—')}</td>` +
+        `<td>${fmtNum(r.n)}</td><td class="${r.pocos ? '' : 'hi'}">${fmtZona(r.e, fl)}</td>` +
+        `<td>${fmtNum(r.na)}</td><td>${fmtZona(r.a, fl)}</td></tr>`).join('');
+    sub.textContent = `Pozos horizontales de Vaca Muerta de la ventana de ${fl === 'p' ? 'petróleo' : 'gas'}, ` +
+      `por concesión declarada. Medianas: EUR/km (pronóstico, mismos pozos que las medianas de arriba) y acumulada de ` +
+      `los primeros 12 meses por km (dato real). Clic en un encabezado para ordenar. En gris, concesiones con menos de ` +
+      `${minN} pozos con EUR/km.`;
+  }).catch(e => { sub.textContent = 'No se pudo cargar data/zonas.json (' + e.message + ').'; tabla.innerHTML = ''; });
+}
+
+// ── Curvas: interferencia padre/hijo (interferencia.json) ──────────────────
+function loadInterf() {
+  if (!interfP) interfP = fetch('data/interferencia.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => (interfData = d))
+    .catch(e => { interfP = null; throw e; });
+  return interfP;
+}
+const INT_MIN_BARRA = 5;          // barras con menos pozos: no se dibujan (n en el tooltip)
+const fmtRatio = x => x == null ? '—' : fmtDec(x, 2) + '×';
+function renderInterferencia() {
+  const caja = document.getElementById('int-cifra');
+  loadInterf().then(d => {
+    const fl = cvV, s = d.stats[fl], sp = d.supuestos, met = intMet, u = uZona(fl);
+    const nomMet = met === 'a' ? 'acumulada de 12 meses por km (dato real)' : `EUR por km (pronóstico; pozos con ≥ ${sp.eur_min_meses} meses)`;
+    const R = s.controlado.hex[met], Rc = s.controlado.conc[met], cl = d.clases[fl];
+    const sens12 = d.sensibilidad && d.sensibilidad.hijo12, S12 = sens12 && sens12.hex[fl] && sens12.hex[fl][met];
+    const pct = R.mediana != null ? Math.round((R.mediana - 1) * 100) : null;
+    const lectura = pct == null ? '' : Math.abs(pct) < 3
+      ? 'los hijos producen prácticamente lo mismo que los padres de su zona'
+      : `los hijos producen ${Math.abs(pct)} % ${pct < 0 ? 'menos' : 'más'} que los padres de su zona (mediana)`;
+    caja.innerHTML = R.mediana == null
+      ? `Sin zonas con ≥ ${sp.min_zona} padres y ≥ ${sp.min_zona} hijos para esta métrica.`
+      : `<div>Hijo / padre en el mismo hexágono · ${fl === 'p' ? 'petróleo' : 'gas'} · ${nomMet}</div>
+        <div class="big">${fmtRatio(R.mediana)}</div>
+        <div>${lectura}. Mediana de los cocientes de <b>${fmtNum(R.zonas)} hexágonos</b> con ≥ ${sp.min_zona} padres y
+          ≥ ${sp.min_zona} hijos · rango P25–P75 entre zonas: ${fmtRatio(R.p25)} – ${fmtRatio(R.p75)}.</div>
+        <div class="sec">Por concesión: ${fmtRatio(Rc.mediana)} en ${fmtNum(Rc.zonas)} concesiones (P25–P75 ${fmtRatio(Rc.p25)} – ${fmtRatio(Rc.p75)}).
+          Pozos clasificados: ${fmtNum(cl.P)} padres, ${fmtNum(cl.H)} hijos, ${fmtNum(cl.I)} intermedios.</div>` +
+        (S12 && S12.mediana != null ? `<div class="sec">Sensibilidad, hijo = vecino ${sens12.meses_hijo} meses o más antes
+          (sin meses compartidos en los 12 del padre): ${fmtRatio(S12.mediana)} en ${fmtNum(S12.zonas)} hexágonos
+          (P25–P75 ${fmtRatio(S12.p25)} – ${fmtRatio(S12.p75)}; ${fmtNum(sens12.hijos[fl])} hijos).</div>` : '');
+    const fac = 1 / 1000;
+    const kN = met === 'a' ? 'na' : 'ne';
+    const barra = o => o && o[kN] >= INT_MIN_BARRA && o[met] != null ? o[met] * fac : null;
+    const coh = s.por_cohorte.filter(c => (c.P[kN] >= INT_MIN_BARRA) || (c.H[kN] >= INT_MIN_BARRA));
+    const tip = (lbl, o) => `${lbl}: ${o && o[met] != null ? fmtZona(o[met], fl) + ' ' + u : '—'} · n = ${fmtNum(o ? o[kN] : 0)}` +
+      (o && o[kN] > 0 && o[kN] < INT_MIN_BARRA ? ' (sin barra: pocos pozos)' : '');
+    const fy = v => fl === 'p' ? fmtDecMax(v, 1) : fmtMM(v, true);
+    // Ticks y títulos de ejes con el mismo tamaño (14 px) y un gris más claro que el de Chart.js por defecto
+    const TXT = '#c2cde3';
+    const ejes = (xTit) => ({
+      x: { title: { display: true, text: xTit, font: CV_F, color: TXT }, ticks: { font: CV_F, color: TXT, maxRotation: 0, autoSkip: true },
+           grid: { display: false } },
+      y: { beginAtZero: true, title: { display: true, text: (met === 'a' ? 'acum. 12 meses/km' : 'EUR/km') + ` (${u})`, font: CV_F, color: TXT },
+           ticks: { font: CV_F, color: TXT, callback: v => fy(v) }, grid: { color: '#2a2f42' } },
+    });
+    document.getElementById('int-t1').textContent = `Padres vs. hijos por cohorte · ${met === 'a' ? 'acum. 12 meses/km' : 'EUR/km'} (${u})`;
+    if (chartIntCoh) chartIntCoh.destroy();
+    chartIntCoh = new Chart(document.getElementById('chart-int-coh'), {
+      type: 'bar',
+      data: { labels: coh.map(c => String(c.cohorte)), datasets: [
+        { label: 'Padres', data: coh.map(c => barra(c.P)), backgroundColor: '#7d8aa8', _k: 'P' },
+        { label: 'Hijos', data: coh.map(c => barra(c.H)), backgroundColor: fl === 'p' ? '#e07020' : '#4db6f0', _k: 'H' }] },
+      options: { animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { boxWidth: 14, font: CV_F, color: TXT } },
+          tooltip: { titleFont: CV_F, bodyFont: CV_F, callbacks: {
+            title: it => it.length ? `Cohorte ${it[0].label}` : '',
+            label: c => tip(c.dataset.label, coh[c.dataIndex][c.dataset._k]) } } },
+        scales: ejes('año de arranque') } });
+    document.getElementById('int-n1').textContent = `Medianas por año de arranque. Sin barra: menos de ${INT_MIN_BARRA} pozos ` +
+      `(n en el tooltip). Comparación sin controlar por zona: los padres de cada cohorte pueden estar en zonas distintas que los hijos.`;
+    const tr = s.por_tramo, padres = s.padres;
+    const lbls = ['Padres'].concat(tr.map(t => t.tramo[1] == null ? `≥ ${t.tramo[0]}` : `${t.tramo[0]}–${t.tramo[1]}`));
+    const objs = [padres].concat(tr);
+    document.getElementById('int-t2').textContent = `Hijos según cuántos meses antes arrancó el vecino más viejo · ` +
+      `${met === 'a' ? 'acum. 12 meses/km' : 'EUR/km'} (${u})`;
+    if (chartIntTramo) chartIntTramo.destroy();
+    chartIntTramo = new Chart(document.getElementById('chart-int-tramo'), {
+      type: 'bar',
+      data: { labels: lbls, datasets: [{ label: met === 'a' ? 'acum. 12 meses/km' : 'EUR/km', data: objs.map(barra),
+        backgroundColor: objs.map((o, i) => i === 0 ? '#7d8aa8' : (fl === 'p' ? '#e07020' : '#4db6f0')) }] },
+      options: { animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { titleFont: CV_F, bodyFont: CV_F, callbacks: { label: c => tip(c.label, objs[c.dataIndex]) } } },
+        scales: ejes('meses entre el arranque del vecino más viejo y el del hijo') } });
+    document.getElementById('int-n2').textContent = 'Medianas de todos los hijos de cada tramo, sin controlar por zona ni por ' +
+      'cohorte: un vecino más viejo implica un hijo más nuevo (otro diseño de fractura). La barra gris es la mediana de todos los padres.';
+    document.getElementById('int-supuestos').innerHTML = '<b>Supuestos</b><ul>' +
+      (sp.textos || []).map(t => `<li>${t}</li>`).join('') + `<li>Datos hasta ${d.ultimo}.</li></ul>`;
+  }).catch(e => { caja.textContent = 'No se pudo cargar data/interferencia.json (' + e.message + '). Volvé a abrir la pestaña.'; });
+}
+
+// Línea padre/hijo del popup de un pozo VM horizontal (interferencia.json -> pozos[id])
+function padreHijoHTML(d, id) {
+  const z = d && d.pozos && d.pozos[id];
+  if (!z) return '';
+  const [clase, nPrev, viejo, dist, herm] = z;
+  const rad = fmtNum((d.supuestos && d.supuestos.radio_m) || 1000);
+  const radTxt = rad === '1.000' ? '1 km' : rad + ' m';
+  const her = herm ? ` · ${herm} hermano${herm === 1 ? '' : 's'} de la misma locación` : '';
+  const vec = n => `${n} vecino${n === 1 ? '' : 's'} previo${n === 1 ? '' : 's'}`;
+  let t;
+  if (clase === 'H') t = `<b>Pozo hijo:</b> ${vec(nPrev)} a &lt; ${radTxt} (el vecino más viejo arrancó ${viejo} meses antes; ` +
+    `el más cercano está a ${fmtNum(dist)} m)`;
+  else if (clase === 'I') t = `<b>Pozo intermedio:</b> ${vec(nPrev)} a &lt; ${radTxt} (el vecino más viejo arrancó ${viejo} ` +
+    `mes${viejo === 1 ? '' : 'es'} antes)`;
+  else t = `<b>Pozo padre:</b> sin productores previos a &lt; ${radTxt}`;
+  return `<span class="ph">${t}${her} <span class="nota">(coordenada de superficie)</span></span>`;
+}
+
 // ── Popup: sección Declinación (pozos NC de curvas_pozos.json) ───────────────
 function declPlaceholder(r) {
   const id = r[I.id];
@@ -1925,7 +2259,8 @@ const R2_POBRE = 0.6;
 const COLOR_AJUSTE = '#555';
 
 function fillDecl(box, popup) {
-  loadCurvasPozos().then(cp => {
+  // interferencia.json es opcional para el popup: si falla, el popup sale sin la línea padre/hijo
+  Promise.all([loadCurvasPozos(), loadInterf().catch(() => null)]).then(([cp, inf]) => {
     if (!box.isConnected) return;
     const z = cp.pozos[box.dataset.id];
     if (!z) { box.remove(); return; }
@@ -1995,6 +2330,7 @@ function fillDecl(box, popup) {
       const motivo = motivoCorto((cp.motivos && cp.motivos[q]) || q || 'sin ajuste');
       txt = `Sin pronóstico (${motivo}). EUR = acumulada = ${fmtEurU(eurV != null ? eurV : acum, v)}`;
     }
+    txt += padreHijoHTML(inf, box.dataset.id);
     const av = cp.avisos || {};
     const avisos = [];
     if (q === 'ok' && joven) avisos.push(av['j' + v] || 'pozo joven: b limitado');

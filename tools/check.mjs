@@ -34,6 +34,80 @@ try {
     Object.values(L).forEach(l => map.removeLayer(l));
     return {ok: Object.values(n).every(v => v > 0), info: JSON.stringify(n)}; })()`);
 
+  await check("capa Zonas VM: hexágonos con color, rayado en pocos pozos, leyenda y popup", `(async () => {
+    map.addLayer(zonasLayer);
+    for (let i = 0; i < 40 && !zonasLayer.getLayers().length; i++) await new Promise(r => setTimeout(r, 250));
+    const est = () => { const ls = zonasLayer.getLayers();
+      return {n: ls.length, color: ls.filter(l => l.options.fill !== false && /^#/.test(l.options.fillColor)).length,
+              rayado: ls.filter(l => l.options.fill !== false && /url\\(#zonas-rayado\\)/.test(l.options.fillColor)).length}; };
+    const p = est();
+    const leg = document.querySelector('.zonas-leg');
+    const legOk = !!leg && /mil m³\\/km/.test(leg.textContent) && /pocos pozos/.test(leg.textContent) && leg.querySelectorAll('.sw').length >= 6
+      && parseFloat(getComputedStyle(leg).fontSize) >= 14;
+    const lyr = zonasLayer.getLayers().find(l => { const q = l.feature.properties.p; return q && !q.pocos && q.e10 != null; });
+    abrirZonaEn(lyr.getBounds().getCenter());
+    await new Promise(r => setTimeout(r, 300));
+    const pop = document.querySelector('.leaflet-popup.pozo-popup');
+    const t = pop ? pop.textContent : '';
+    const popOk = /coordenada de superficie; la rama puede extenderse 2–3 km/.test(t) && /EUR\\/km rango P90–P10/.test(t) && /P90 conservador – P10 optimista/.test(t) && !/NaN|undefined/.test(t);
+    map.closePopup();
+    leg.querySelector('[data-zv="g"]').click();
+    const g = est();
+    const legG = /MMm³\\/km/.test(document.querySelector('.zonas-leg').textContent);
+    document.querySelector('.zonas-leg [data-zv="p"]').click();
+    map.removeLayer(zonasLayer);
+    const sinLeg = !document.querySelector('.zonas-leg');
+    return {ok: p.n > 50 && p.color > 50 && p.rayado > 0 && g.color > 10 && legOk && legG && popOk && sinLeg,
+      info: p.n + ' hexágonos · petróleo ' + p.color + ' con color / ' + p.rayado + ' rayados · gas ' + g.color + ' / ' + g.rayado
+        + ' · popup: ' + t.slice(0, 80)}; })()`);
+
+  await check("capa Zonas VM prendida: clic en un pozo abre el del pozo; clic en zona sin pozo abre el del hexágono; clusters translúcidos", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    map.closePopup();
+    map.addLayer(zonasLayer);
+    for (let i = 0; i < 40 && !zonasLayer.getLayers().length; i++) await espera(250);
+    const translucido = map.getContainer().classList.contains('zonas-on');
+    const r = lastFiltered.find(r => /vaca muerta/i.test(r[I.form] || '') && zonaEn(r[I.lat], r[I.lon]));
+    if (!r) { map.removeLayer(zonasLayer); return {ok: false, info: 'ningún pozo VM dentro de un hexágono'}; }
+    map.setView([r[I.lat], r[I.lon]], 14, {animate: false});
+    await espera(1200);
+    const clic = (pt) => {
+      const rect = map.getContainer().getBoundingClientRect();
+      const x = rect.left + pt.x, y = rect.top + pt.y;
+      const el = document.elementFromPoint(x, y);
+      const o = {bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, view: window};
+      ['mousedown', 'mouseup', 'click'].forEach(t => el.dispatchEvent(new MouseEvent(t, o)));
+      return el;
+    };
+    const el1 = clic(map.latLngToContainerPoint([r[I.lat], r[I.lon]]));
+    await espera(600);
+    const pop1 = document.querySelector('.leaflet-popup');
+    const t1 = pop1 ? (pop1.querySelector('.lf-popup-sub') || pop1).textContent : '';
+    const okPozo = !!pop1 && t1.trim() === String(r[I.sigla]).trim() && !/Zona Vaca Muerta/.test(pop1.textContent);
+    map.closePopup(); await espera(200);
+    // Punto dentro del mismo hexágono a más de 20 px de cualquier pozo visible
+    const f = zonaEn(r[I.lat], r[I.lon]);
+    const ring = f.geometry.coordinates[0];
+    const c = ring.slice(0, 6).reduce((a, q) => [a[0] + q[0] / 6, a[1] + q[1] / 6], [0, 0]);
+    const cands = [c].concat(ring.slice(0, 6).flatMap(q => [0.3, 0.55, 0.8].map(k => [c[0] + (q[0] - c[0]) * k, c[1] + (q[1] - c[1]) * k])));
+    const pts = lastFiltered.map(p => map.latLngToContainerPoint([p[I.lat], p[I.lon]]));
+    const sz = map.getSize();
+    const libre = cands.map(q => map.latLngToContainerPoint([q[1], q[0]]))
+      .find(pt => pt.x > 30 && pt.y > 30 && pt.x < sz.x - 300 && pt.y < sz.y - 30 && pts.every(p => p.distanceTo(pt) > 20));
+    let okZona = false, t2 = 'sin punto libre dentro del hexágono';
+    if (libre) {
+      clic(libre); await espera(600);
+      const pop2 = document.querySelector('.leaflet-popup');
+      t2 = pop2 ? pop2.textContent.slice(0, 60) : 'sin popup';
+      okZona = !!pop2 && /Zona Vaca Muerta/.test(pop2.textContent);
+      map.closePopup();
+    }
+    map.removeLayer(zonasLayer);
+    const vuelve = !map.getContainer().classList.contains('zonas-on');
+    return {ok: okPozo && okZona && translucido && vuelve,
+      info: 'clic sobre ' + (el1 && el1.tagName) + ' → ' + (t1.trim() || 'sin popup') + ' (esperado ' + r[I.sigla] + ') · zona: '
+        + t2.replace(/\\s+/g, ' ') + ' · clase zonas-on ' + translucido + '/' + !vuelve}; })()`);
+
   await check("popup de pozo con gráfico de evolución", `(async () => {
     const r = lastFiltered.find(r => r[I.pet] > 1000 && sparkData.pozos[r[I.id]]);
     const h = pozoPopupHTML(r);
@@ -176,6 +250,22 @@ try {
         info: 'colores ' + colores.join('/') + ' · ' + (tAmb || 'sin aviso ámbar') + ' · ' + empInfo}; })()`);
   }
 
+  for (const [clase, re] of [["H", "Pozo hijo: \\\\d+ vecinos? previos? a < 1 km \\\\(el vecino más viejo arrancó \\\\d+ meses antes"],
+                             ["P", "Pozo padre: sin productores previos a < 1 km"]]) {
+    await check(`popup VM: línea padre/hijo (clase ${clase})`, `(async () => {
+      const [cp, inf] = await Promise.all([loadCurvasPozos(), loadInterf()]);
+      const r = lastFiltered.find(r => { const z = inf.pozos[r[I.id]]; return z && z[0] === '${clase}' && cp.pozos[r[I.id]]; });
+      if (!r) return {ok: false, info: 'ningún pozo de clase ${clase} en el año'};
+      flyToPozo(r[I.id]);
+      let t = '';
+      for (let i = 0; i < 40; i++) { await new Promise(res => setTimeout(res, 250));
+        const b = document.querySelector('.leaflet-popup .decl-txt .ph'); if (b) { t = b.textContent; break; } }
+      const fs = t ? parseFloat(getComputedStyle(document.querySelector('.leaflet-popup .decl-txt .ph')).fontSize) : 0;
+      map.closePopup();
+      return {ok: new RegExp('${re}').test(t) && !/NaN|undefined|null/.test(t) && fs >= 14,
+        info: 'idpozo ' + r[I.id] + ' · ' + t}; })()`);
+  }
+
   await check("pestañas: ninguna desborda su botón (sidebar angosto)", `(() => {
     const b = [...document.querySelectorAll('#tabs .tab-btn')].filter(x => x.scrollWidth > x.clientWidth + 1);
     return {ok: b.length === 0, info: document.getElementById('tabs').offsetHeight + ' px de alto', mal: b.map(x => x.textContent)}; })()`);
@@ -211,6 +301,34 @@ try {
     document.querySelector('.tab-btn[data-tab="filtros"]').click();
     return {ok: h.includes('EUR P50 (MMm³)') && h.includes('MMm³/km') && h.includes('Con EUR válida') && hp.includes('(m³/km)')
       && !/mil Mm³|NaN|undefined/.test(txt) && !/mil/.test(ticks), info: h}; })()`);
+
+  await check("Curvas: tabla por concesión e interferencia padre/hijo con números (petróleo y gas, EUR/km)", `(async () => {
+    document.querySelector('.tab-btn[data-tab="curvas"]').click();
+    for (let i = 0; i < 40 && !(chartIntCoh && document.querySelectorAll('#cv-conc tr').length > 1); i++)
+      await new Promise(r => setTimeout(r, 250));
+    const leer = () => {
+      const cifra = document.getElementById('int-cifra').textContent;
+      const nums = ds => ds.flatMap(d => d.data).filter(v => v != null && isFinite(v)).length;
+      return {cifra, ok: /\\d+,\\d+×/.test(cifra) && /\\d+ hexágonos/.test(cifra) && !!chartIntCoh && !!chartIntTramo
+        && nums(chartIntCoh.data.datasets) >= 4 && nums(chartIntTramo.data.datasets) >= 3};
+    };
+    const p = leer();
+    const conc = document.querySelectorAll('#cv-conc tr').length - 1;
+    const sup = document.getElementById('int-supuestos').textContent;
+    const supOk = /superficie/i.test(sup) && /Hermanos/.test(sup) && /correlación, no causa/.test(document.getElementById('tab-curvas').innerText);
+    document.querySelector('#int-met [data-m="e"]').click(); await new Promise(r => setTimeout(r, 300));
+    const e = leer();
+    document.querySelector('#cv-v [data-v="g"]').click(); await new Promise(r => setTimeout(r, 400));
+    const g = leer();
+    const concG = document.getElementById('cv-conc').rows[0].textContent;
+    document.querySelector('#int-met [data-m="a"]').click();
+    document.querySelector('#cv-v [data-v="p"]').click(); await new Promise(r => setTimeout(r, 300));
+    const txt = document.getElementById('tab-curvas').innerText;
+    document.querySelector('.tab-btn[data-tab="filtros"]').click();
+    const sensOk = [p, e, g].every(x => /Sensibilidad, hijo = vecino 12 meses o más antes[^]*\\d+,\\d+× en \\d+ hexágonos/.test(x.cifra))
+      && /Sesgo hacia 1/.test(sup);
+    return {ok: p.ok && e.ok && g.ok && conc > 5 && supOk && sensOk && concG.includes('MMm³/km') && !/NaN|undefined|Infinity/.test(txt),
+      info: conc + ' concesiones · ' + p.cifra.replace(/\\s+/g, ' ').slice(0, 150)}; })()`);
 
   for (const tab of ["geo", "curvas"]) {
     await check(`pestaña ${tab}: sin scroll horizontal con la barra a 350 px`, `(async () => {

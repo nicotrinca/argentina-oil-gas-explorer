@@ -4,6 +4,10 @@
    Posibles mejoras: letra 12 px que queda en Geo (`.geo-note`, `.band-row .pct`, `.qa-row .d`, ticks de fractura);
    ~150 pozos ok cuyo pronóstico arranca > 2× el último mes (meses parciales al final); curvas tipo de otras
    formaciones NC; ajuste combinado petróleo+gas en m³eq.
+1b. ~~**Zonas productivas VM + interferencia padre/hijo**~~ — HECHO 2026-11-12 (capa de hexágonos, tabla por
+   concesión e interferencia en Curvas, línea en el popup). Resultado: petróleo hijo/padre ≈ 1,0 (55 hex), gas ≈ 0,90.
+   Detalles: verdes de gas apagados poco distinguibles; ticks de los minigráficos del popup ~11 px;
+   falta probar en celular (el panel tapa el mapa a 400 px, problema general).
 2. ~~**Publicarlo online**~~ — HECHO 2026-11-11: https://pozos-argentina.web.app (Firebase Hosting).
    Detalles menores: en celular (400 px) el control de capas del mapa asoma recortado a la derecha;
    falta `favicon.ico` (404 en consola).
