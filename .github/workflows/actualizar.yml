@@ -1,0 +1,127 @@
+# Actualización mensual de los datos del visor (Capítulo IV, Secretaría de Energía) y publicación en Firebase.
+# Corre tools/actualizar.py: baja lo nuevo de datos.energia.gob.ar, corre los preprocess, controla
+# (meses publicados ±3 %, caída del último mes, pozos por año, tools/check.mjs) y, si todo pasa, despliega.
+# Si algo falla el job falla y GitHub le avisa por mail al dueño del repo; data/_informe.md queda como
+# artifact y en el resumen del job.
+# Secret necesario: FIREBASE_SERVICE_ACCOUNT (JSON de una cuenta de servicio con rol Firebase Hosting Admin,
+# ver README "Monthly update" / HANDOFF "Actualización mensual").
+name: Actualización mensual de datos
+
+on:
+  schedule:
+    # Día 20 de cada mes, 10:00 UTC = 07:00 hora de Argentina (UTC−3, sin horario de verano).
+    # Para el 20 las empresas ya cargaron casi todo el mes anterior al anterior.
+    - cron: "0 10 20 * *"
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar en Firebase si pasan los controles (el cron publica siempre)"
+        type: boolean
+        default: false
+      aceptar_cambios:
+        description: "Aceptar cambios > ±3 % en meses ya publicados (revisar el informe)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: actualizar-datos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PYTHONIOENCODING: utf-8
+      CHROME_PATH: /usr/bin/google-chrome
+      # Versión fija: la misma con la que se publicó a mano (firebase --version, 2026-11). Subirla a propósito.
+      FIREBASE_TOOLS_VERSION: "15.28.1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Dependencias Python
+        run: pip install -r requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Datos crudos (~1,9 GB sin comprimir, ~240 MB en la caché): se restaura la caché más reciente y
+      # tools/actualizar.py baja solo lo que cambió en el catálogo (data/_fuentes.json guarda id, fecha, tamaño y
+      # sha256 de cada recurso). Ojo: GitHub borra las cachés que no se usan en 7 días, así que en la corrida
+      # mensual casi siempre se baja todo (~1,6 GB, pocos minutos); la caché sirve para re-correr a mano.
+      - name: Restaurar datos crudos
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/produccion-*.csv
+            data/capitulo-iv-pozos.csv
+            data/concesiones_shp
+            data/geo
+            data/_fuentes.json
+          key: datos-crudos-${{ github.run_id }}
+          restore-keys: datos-crudos-
+
+      - name: Servidor local para tools/check.mjs
+        run: |
+          nohup python -m http.server 8765 > "$RUNNER_TEMP/http.log" 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://localhost:8765/ > /dev/null && exit 0; sleep 1; done
+          echo "::error::el servidor local no arrancó"; exit 1
+
+      - name: Bajar, procesar y controlar
+        run: |
+          python tools/test_comun.py
+          python tools/actualizar.py ${{ inputs.aceptar_cambios && '--aceptar-cambios' || '' }}
+
+      - name: Informe en el resumen del job
+        if: always()
+        run: |
+          if [ -f data/_informe.md ]; then cat data/_informe.md >> "$GITHUB_STEP_SUMMARY"
+          else echo "No se generó data/_informe.md" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Subir informe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informe-${{ github.run_id }}
+          path: data/_informe.md
+          if-no-files-found: warn
+
+      # Se guarda aunque fallen los controles: lo bajado sigue sirviendo para la próxima corrida.
+      - name: Guardar caché de datos crudos
+        if: always() && hashFiles('data/_fuentes.json') != ''
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/produccion-*.csv
+            data/capitulo-iv-pozos.csv
+            data/concesiones_shp
+            data/geo
+            data/_fuentes.json
+          key: datos-crudos-${{ github.run_id }}
+
+      - name: Publicar en Firebase Hosting
+        if: success() && (github.event_name == 'schedule' || inputs.publicar)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Falta el secret FIREBASE_SERVICE_ACCOUNT (ver README, Monthly update)"; exit 1
+          fi
+          SA="$RUNNER_TEMP/firebase-sa.json"
+          # la credencial se borra al salir, aunque falle el deploy
+          trap 'rm -f "$SA"' EXIT
+          (umask 077; printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$SA")
+          export GOOGLE_APPLICATION_CREDENTIALS="$SA"
+          # el predeploy de firebase.json corre node tools/build_public.mjs (arma public/)
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy --only hosting --project pozos-argentina --non-interactive

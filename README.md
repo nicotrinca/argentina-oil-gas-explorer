@@ -65,6 +65,9 @@ azimuthal equal-area projection centred on Argentina.
 
 ### 1. Download the raw data into `data/`
 
+(Or run `python tools/actualizar.py --solo-bajar`, which downloads and renames everything; see
+[Monthly update](#monthly-update-github-actions).)
+
 From the Secretaría de Energía open data portal
 ([datos.energia.gob.ar](http://datos.energia.gob.ar/)), all CC-BY-4.0:
 
@@ -99,6 +102,8 @@ python preprocess_ranking.py    # ranking.json
 python preprocess_temporal.py   # serie_cuencas/empresas/nacional.json, sparklines.json
 python preprocess_geo.py        # basins, fields, permits, pipelines, refineries (needs areas.geojson)
 python preprocess_fractura.py   # fractura.json (fracturing × monthly production)
+python preprocess_curvas.py     # curvas.json, curvas_pozos.json (type curves, EUR)
+python preprocess_zonas.py      # zonas.json, interferencia.json (needs curvas)
 ```
 
 To run the GeoPandas guide: `pip install jupyter matplotlib` and open
@@ -113,6 +118,42 @@ python -m http.server 8765
 Open <http://localhost:8765>. (A local server is needed because the page fetches JSON files.)
 After re-running the preprocess scripts, hard-refresh the page (Ctrl+F5) so the browser does
 not keep cached data.
+
+## Monthly update (GitHub Actions)
+
+`tools/actualizar.py` automates steps 1–2: it reads the CKAN catalog of datos.energia.gob.ar, downloads
+only the resources that changed (tracked in `data/_fuentes.json`), unzips/renames them as listed above,
+runs every preprocess script, and checks the result before publishing: months already published must not
+change by more than ±3 % (wells, oil, gas), no new month may drop more than 15 % (vs the previous month,
+the median of the 3 before it, and the last published value), the number of wells per year must not drop
+more than 5 %, and `node tools/check.mjs` must pass. Without a reference to compare against (published site
+down and no copy from a previous successful run) it fails unless `--sin-referencia` is given. It writes a
+report to `data/_informe.md`. Trailing months reported by fewer than 90 % of the producing wells of the
+best of the 3 preceding months are treated as incomplete and left out (`comun.py`, tests in
+`tools/test_comun.py`).
+
+```bash
+python tools/actualizar.py              # download + preprocess + checks (does not publish)
+python tools/actualizar.py --publicar   # ... and `firebase deploy --only hosting` if every check passes
+python tools/actualizar.py --sin-bajar  # reprocess what is already in data/
+```
+
+`.github/workflows/actualizar.yml` runs it on the 20th of each month (07:00 Argentina time) and on demand
+(*Actions → Actualización mensual de datos → Run workflow*; a manual run only deploys if *publicar* is
+checked, the monthly schedule always deploys when every check passes). Raw data is kept in the Actions cache (~240 MB; GitHub evicts caches unused for 7 days, so the
+monthly run usually downloads everything again, which takes a few minutes). If any
+check fails the job fails (GitHub emails the repository owner) and nothing is deployed; the report is in
+the job summary and as an artifact.
+
+**Setting up the deploy secret** (one time):
+
+1. Google Cloud Console → project `pozos-argentina` → *IAM & Admin → Service Accounts → Create service
+   account* (e.g. `github-deploy`), with the roles **Firebase Hosting Admin** and **API Keys Viewer**.
+2. Open the account → *Keys → Add key → Create new key → JSON*; a `.json` file is downloaded.
+3. GitHub repository → *Settings → Secrets and variables → Actions → New repository secret*:
+   name `FIREBASE_SERVICE_ACCOUNT`, value = the whole content of that JSON file. Then delete the local file.
+4. Run the workflow once by hand with *publicar* checked. The first run downloads ~1.6 GB; if sources were re-published and an
+   old month changed by more than 3 %, review the report and re-run with *aceptar_cambios* checked.
 
 ## Data sources and notes
 

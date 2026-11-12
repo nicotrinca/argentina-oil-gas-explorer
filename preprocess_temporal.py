@@ -2,11 +2,16 @@
 Genera datos temporales para la serie histórica 2022-2026:
   - data/serie_cuencas.json  → prod mensual por cuenca (para el gráfico del sidebar)
   - data/sparklines.json     → últimos 24 meses por pozo (para popup)
+  - data/serie_nacional.json → periodos, pet (m³), gas (Mm³) y pozos (nº de idpozo con producción) por mes
+  - data/serie_empresas.json → top 15 empresas
+Recorta al último mes completo (comun.ultimo_mes_produccion, regla del 90 % de pozos).
 """
 import json
 import pandas as pd
 
-YEARS = [2022, 2023, 2024, 2025, 2026]
+from comun import anios_produccion, ultimo_mes_produccion, pozos_por_mes
+
+YEARS = anios_produccion()
 COLS  = ["idpozo", "anio", "mes", "prod_pet", "prod_gas", "cuenca", "provincia", "empresa"]
 
 print("Cargando todos los años...")
@@ -24,14 +29,10 @@ print(f"Total: {len(prod):,} filas")
 # Columna periodo YYYY-MM para ordenar
 prod["periodo"] = prod["anio"].astype(str) + "-" + prod["mes"].astype(str).str.zfill(2)
 
-# ── Recortar meses sin datos reales (reporte incompleto) ───────────────────
-# El último mes calendario suele venir vacío/parcial porque las empresas
-# cargan el Cap. IV con atraso. Tomamos el último período con producción real.
-tot_mes = prod.groupby("periodo")[["prod_pet", "prod_gas"]].sum().sum(axis=1)
-periodos_validos = sorted(tot_mes[tot_mes > 0].index)
-ult_valido = periodos_validos[-1]
-desc = sorted(set(prod["periodo"]) - set(periodos_validos))
-print(f"Último mes con datos: {ult_valido} | descartados (vacíos): {desc}")
+# ── Recortar meses incompletos (Cap. IV con atraso) ─────────────────────────
+# El o los últimos meses vienen vacíos o a medio cargar. Regla compartida en comun.py:
+# se descartan los meses finales con < 90 % de los pozos con producción del mes anterior.
+ult_valido = str(ultimo_mes_produccion())
 prod = prod[prod["periodo"] <= ult_valido].copy()
 
 # ── Serie mensual por cuenca ───────────────────────────────────────────────
@@ -119,10 +120,13 @@ nacional = (
 )
 nacional["pet"] = nacional["pet"].round(0).astype(int)
 nacional["gas"] = nacional["gas"].round(0).astype(int)
+# Pozos con producción por mes (lo usa tools/actualizar.py para comparar contra lo publicado)
+npozos = pozos_por_mes(prod.assign(periodo=pd.PeriodIndex(prod["periodo"], freq="M")))
 nacional_dict = {
     "periodos": nacional["periodo"].tolist(),
     "pet":      nacional["pet"].tolist(),
     "gas":      nacional["gas"].tolist(),
+    "pozos":    [int(npozos.get(pd.Period(p, freq="M"), 0)) for p in nacional["periodo"]],
 }
 with open("data/serie_nacional.json", "w", encoding="utf-8") as f:
     json.dump(nacional_dict, f, ensure_ascii=False, separators=(",", ":"))

@@ -89,6 +89,8 @@ import json
 import numpy as np
 import pandas as pd
 
+from comun import ultimo_mes_completo, ultimo_mes_produccion
+
 GAS_A_PET = 1000 / 1069          # Mm³ de gas -> m³ equivalentes de petróleo (6:1)
 GOR_GAS = 3000                   # m³/m³: por encima, el pozo es de la ventana de gas
 DMIN_ANUAL = 0.08                # declinación terminal (efectiva anual)
@@ -242,8 +244,9 @@ neg = (d["prod_pet"] < 0) | (d["prod_gas"] < 0)
 print(f"  {int(neg.sum()):,} filas con producción negativa -> recortadas a 0")
 d[["prod_pet", "prod_gas"]] = d[["prod_pet", "prod_gas"]].fillna(0).clip(lower=0)
 d["periodo"] = pd.PeriodIndex.from_fields(year=d["anio"], month=d["mes"], freq="M")
-tot = d.groupby("periodo")["prod_pet"].sum()
-ultimo = tot[tot >= 0.8 * tot.iloc[-7:-1].median()].index.max()
+# Meses finales incompletos (Cap. IV con atraso): regla compartida de comun.py sobre los pozos de este
+# archivo, y nunca después del corte del total país (así curvas, zonas y series terminan en el mismo mes).
+ultimo = min(ultimo_mes_completo(d, nombre="no convencional"), ultimo_mes_produccion())
 d = d[d["periodo"] <= ultimo]
 print(f"  {len(d):,} filas, {d.idpozo.nunique():,} pozos, hasta {ultimo}")
 

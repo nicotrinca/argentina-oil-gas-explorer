@@ -11,7 +11,13 @@
 2. ~~**Publicarlo online**~~ — HECHO 2026-11-11: https://pozos-argentina.web.app (Firebase Hosting).
    Detalles menores: en celular (400 px) el control de capas del mapa asoma recortado a la derecha;
    falta `favicon.ico` (404 en consola).
-3. **Actualización mensual automática**: tarea programada que baje el Cap. IV, corra los preprocess y republique.
+3. ~~**Actualización mensual automática**~~ — HECHO 2026-11-12: `tools/actualizar.py` + `.github/workflows/actualizar.yml`
+   (día 20). Falta que el usuario cree la cuenta de servicio y cargue el secret `FIREBASE_SERVICE_ACCOUNT`.
+   Quedan años fijos: `<option>` de `#f-year` en index.html (2027 no entra solo), `preprocess_ranking.py`
+   (2024 vs 2025), `preprocess.py` (2024), estadísticas 2025 en areas/geo. Hacerlos dinámicos (últimos 12 meses).
+   `tools/test_comun.py` imprime ✔ y en la consola de Windows hace falta `PYTHONIOENCODING=utf-8`.
+7. **Panel lateral más ancho y prioridades visuales** (propuesto 2026-11-12, esperando OK): ancho por pestaña,
+   divisor arrastrable, botón Ampliar, encabezado compacto, ranking sin cifras cortadas.
 4. **Pozos que entran y salen de producción**: conexiones nuevas, cierres y reactivaciones por mes, operador y área.
 5. **Ficha por área de concesión**: serie temporal, mezcla petróleo/gas, top pozos, GOR y corte de agua en el tiempo.
    Incluye arreglar las concesiones superpuestas (LOMA LA LATA - SIERRA BARROSA / LA ANGOSTURA SUR I, mismos 57 pozos).

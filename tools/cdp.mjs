@@ -4,11 +4,22 @@ import { mkdtempSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Chrome/Edge/Chromium: primero CHROME_PATH (si está definida), después rutas estándar de Windows, Linux y macOS.
 const CHROMES = [
+  process.env.CHROME_PATH,
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-];
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/snap/bin/chromium",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+].filter(Boolean);
+// En CI con Linux (GitHub Actions, Ubuntu 24.04) el sandbox de Chrome no arranca por AppArmor: sin sandbox.
+// Solo abre http://localhost, así que no hay riesgo. CHROME_NO_SANDBOX=1 lo fuerza en otros entornos.
+const SIN_SANDBOX = process.platform === "linux" && (process.env.CI || process.env.CHROME_NO_SANDBOX === "1");
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const BASE = process.env.POZOS_URL || "http://localhost:8765/";
 
@@ -17,10 +28,11 @@ export const BASE = process.env.POZOS_URL || "http://localhost:8765/";
 // en paralelo nunca se enganchan al Chrome del otro. Si se pasa `port`, se usa ese (sólo para depurar).
 export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
   const chrome = CHROMES.find(existsSync);
-  if (!chrome) throw new Error("no encontré Chrome ni Edge");
+  if (!chrome) throw new Error("no encontré Chrome ni Edge (definí CHROME_PATH con la ruta al ejecutable)");
   const dir = mkdtempSync(join(tmpdir(), "pozos-"));
   const proc = spawn(chrome, ["--headless=new", "--disable-gpu", "--hide-scrollbars", `--remote-debugging-port=${port}`,
     `--user-data-dir=${dir}`, `--window-size=${width},${height}`, "--no-first-run", "--no-default-browser-check",
+    ...(SIN_SANDBOX ? ["--no-sandbox", "--disable-dev-shm-usage"] : []),
     "about:blank"], { stdio: "ignore" });
   const portFile = join(dir, "DevToolsActivePort");
   let target, realPort = port || null;

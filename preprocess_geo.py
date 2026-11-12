@@ -19,13 +19,17 @@ Salida:
   data/geo_qa.json                                pozos con cuenca declarada != polígono
 """
 import json
+import os
 import time
 
 import ftfy
 import geopandas as gpd
 import pandas as pd
 
-YEARS = [2022, 2023, 2024, 2025, 2026]
+from comun import anios_produccion
+
+# años con pozos_<AÑO>.js (preprocess_peryear.py no lo genera si el año todavía no tiene meses completos)
+YEARS = [a for a in anios_produccion() if os.path.exists(f"data/pozos_{a}.js")]
 STATS_YEAR = 2025          # año para sumar producción por cuenca / permiso
 GEO = "data/geo"
 I = dict(lat=0, lon=1, pet=2, gas=3, agua=4, emp=5, cu=6, prov=7, tr=8,

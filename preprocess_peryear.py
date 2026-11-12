@@ -4,13 +4,19 @@ Genera data/pozos_YYYY.js para cada año disponible.
 La clave del pozo es 'idpozo': la sigla NO es única en el padrón (ej. "T-22" es un
 pozo de El Trébol en Cuyana y otro de Tecpetrol en el Noroeste). Agrupar o cruzar por
 sigla suma la producción de pozos distintos y duplica ubicaciones.
+
+Los meses finales incompletos (Cap. IV con atraso) no entran en el total del año ni en "meses activos":
+se recorta al último mes completo de comun.ultimo_mes_produccion() (mismo corte que las series).
 """
 import json
 import pandas as pd
 
-YEARS = [2022, 2023, 2024, 2025, 2026]
+from comun import anios_produccion, ultimo_mes_produccion
+
+YEARS = anios_produccion()
 USECOLS = ["idpozo", "sigla", "prod_pet", "prod_gas", "prod_agua",
-           "empresa", "cuenca", "provincia", "tipo_de_recurso", "tipoestado", "mes"]
+           "empresa", "cuenca", "provincia", "tipo_de_recurso", "tipoestado", "anio", "mes"]
+ULTIMO = ultimo_mes_produccion()
 
 # Cargar coordenadas una sola vez
 print("Cargando coordenadas...")
@@ -49,6 +55,11 @@ print(f"  Saneadas: {n_swap} con lat/lon invertidas corregidas, {n0 - len(coords
 for yr in YEARS:
     print(f"Procesando {yr}...", end=" ", flush=True)
     df = pd.read_csv(f"data/produccion-{yr}.csv", usecols=USECOLS, encoding="utf-8-sig", low_memory=False)
+    per = pd.PeriodIndex.from_fields(year=df["anio"], month=df["mes"], freq="M")
+    df = df[per <= ULTIMO]
+    if df.empty:
+        print(f"sin meses completos (último completo: {ULTIMO}) -> no se genera pozos_{yr}.js")
+        continue
     agg = df.groupby("idpozo").agg(
         pet=("prod_pet","sum"), gas=("prod_gas","sum"), agua=("prod_agua","sum"),
         emp=("empresa","first"), cu=("cuenca","first"), prov=("provincia","first"),

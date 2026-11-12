@@ -277,6 +277,14 @@ try {
       return document.getElementById('tab-${tab}').classList.contains('active'); })()`);
   }
   await check("gráficos de Tendencia y Geo creados", `({ok: !!chartNac && !!chartFrac})`);
+  await check("serie nacional: último mes completo (vs el anterior y vs la mediana de los 3 previos)", `(() => {
+    const s = serieNacional, n = s.periodos.length, p = s.pozos;
+    const med3 = a => { const v = a.slice(n - 4, n - 1).sort((x, y) => x - y); return v[1]; };
+    const okPozos = !p || (p.length === n && p[n - 1] >= 0.9 * p[n - 2] && p[n - 1] >= 0.9 * med3(p));
+    const okPet = s.pet[n - 1] >= 0.85 * s.pet[n - 2] && s.pet[n - 1] >= 0.85 * med3(s.pet);
+    const okGas = s.gas[n - 1] > 0.5 * s.gas[n - 2] && s.gas[n - 1] > 0.5 * med3(s.gas);
+    return {ok: n > 12 && okPozos && okPet && okGas,
+      info: s.periodos[n - 1] + (p ? ' · ' + p[n - 1] + ' pozos (mediana 3 previos ' + med3(p) + ')' : ' · (sin pozos por mes)')}; })()`);
   await check("pestaña Curvas: 2 gráficos, tablas con filas y supuestos", `({
     ok: !!chartCurvas && !!chartEur && chartCurvas.data.datasets.length > 0 && chartEur.data.datasets.some(d => d.data.length)
       && document.querySelectorAll('#cv-coh tr').length > 1 && document.querySelectorAll('#cv-emp tr').length > 1

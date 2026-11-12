@@ -43,7 +43,8 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
 1. `preprocess_peryear.py` → `data/pozos_<AÑO>.js` (array compacto por pozo; índices en `const I` del HTML).
    Corrige lat/lon invertidas (swap si cae en el bbox de Argentina) y descarta irrecuperables (`KNOWN_BAD`).
 2. `preprocess.py`, `preprocess_ranking.py`, `preprocess_temporal.py` (series nacional/cuencas/empresas,
-   `sparklines.json` últimos 24 meses). Recorta al último mes con producción real (Cap. IV llega con atraso).
+   `sparklines.json` últimos 24 meses). Recorta al último mes completo (regla del 90 % en `comun.py`,
+   ver "Actualización mensual"; Cap. IV llega con atraso).
 3. `preprocess_areas.py` → `areas.geojson` (concesiones nacionales; dbf con encoding MIXTO cp1252+UTF-8,
    se lee dos veces y se elige por valor + ftfy).
 4. `preprocess_geo.py` (después de areas) → cuencas/yacimientos/permisos/gasoductos/refinerías + `pozos_geo.json`
@@ -73,6 +74,45 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
    Solo hay coordenada de SUPERFICIE: todo es zonal (la rama de 2–3 km puede estar en otro hexágono).
    Cifra principal: ratio hijo/padre de acum. 12 meses/km dentro de cada hexágono con ≥ 3 padres y ≥ 3 hijos
    (2026-11: petróleo ≈ 1,02 en 55 hexágonos; gas ≈ 0,90 en 18).
+
+## Actualización mensual
+- `tools/actualizar.py` (docstring = manual completo): consulta CKAN, baja lo que cambió (registro en
+  `data/_fuentes.json`: id, last_modified, tamaño, sha256), descomprime/renombra, corre los 9 preprocess en el
+  orden de arriba, controla y escribe `data/_informe.md`. Sin `--publicar` no publica. `--solo-bajar`,
+  `--sin-bajar`, `--aceptar-cambios` (cambios > ±3 % en meses publicados pasan como aviso), `--referencia`,
+  `--sin-referencia`. Códigos: 1 control (o sin referencia), 2 catálogo/descarga, 3 preprocess, 4 deploy.
+- Referencia = el sitio publicado. Si no responde: `data/_previo/` (copia de la última corrida que PASÓ todos los
+  controles; se escribe al final, con marca `_ok.json`). Sin ninguna de las dos → falla y no publica, salvo
+  `--sin-referencia` explícito.
+- Elección de recursos POR NOMBRE (regex sobre el nombre sin tildes), nunca por id: producción = "Producción de
+  Pozos de Gas y Petróleo – <AÑO>" / "- <AÑO>" sin "DDJJ" ni "No Convencional", años ≥ 2022 (un año nuevo entra
+  solo). 2024 y 2025 tienen dos recursos con ese nombre (uno "con identificador", creado 2025-04-29; el de 2025
+  con columna extra `id`). Verificado 2026-11-12: mismos totales por mes (pozos, petróleo, gas) entre sí y contra
+  lo local, pero NO las mismas filas: los dos de 2025 traen 92 filas más que el CSV local de junio (todas en cero,
+  nov-dic: 50 de PETROLERA DEL COMAHUE y 42 de ENERGICON) → se toma el de last_modified más reciente. Si falta un año cerrado o un recurso no matchea → error con la lista de nombres del catálogo.
+- **Último mes completo** (`comun.py`, lo usan peryear, temporal, fractura y curvas): se descartan desde el final
+  los meses con < 90 % de los pozos con producción del MÁXIMO de los 3 meses previos (no solo del anterior: así
+  caen también varios parciales seguidos, [24000, 23900, 5000, 4800], y ceros finales). Reemplaza las tres reglas
+  viejas (total > 0, > 50 % del máximo, ≥ 80 % de la mediana) que dejaban pasar un mes con 48 pozos (oct-2026).
+  Curvas (y zonas, que lee su `ultimo`) usan min(corte NC, corte país): todo el sitio termina en el mismo mes.
+  Con los datos de 2026-11-11 el resultado es idéntico al anterior. Tests: `tools/test_comun.py`.
+  `data/_meses.json` = caché de pozos/pet/gas por mes.
+- `serie_nacional.json` trae además `pozos` (pozos con producción por mes) para comparar contra lo publicado.
+- Controles (constantes arriba del script): meses publicados ±3 % en pozos/petróleo/gas (el último publicado
+  puede crecer hasta +12 %, porque se publica con ≥ 90 % de los pozos); ningún mes nuevo cae > 15 % en
+  pozos, petróleo ni petróleo equivalente contra el mes anterior, la mediana de los 3 previos y (el primero) lo
+  publicado del último mes publicado — no depende de la referencia (el gas solo avisa: ago→sep 2025 cayó 15,1 %);
+  pozos por año (`pozos_<año>.js`) no bajan > 5 %; `node tools/check.mjs` en verde.
+- Año nuevo: los preprocess lo toman solos, pero el visor y `build_public.mjs` usan los `<option>` de `#f-year` en
+  `index.html` → hay que agregar el año a mano (el informe avisa).
+- GitHub Actions: `.github/workflows/actualizar.yml`, día 20 a las 07:00 AR + manual. Caché de datos crudos
+  (`actions/cache`, clave por corrida, restaura la última; ~240 MB comprimida). GitHub borra cachés sin uso en
+  7 días: la corrida mensual casi siempre baja todo (~1,6 GB); la caché sirve para re-correr a mano. Deploy con el secret `FIREBASE_SERVICE_ACCOUNT`
+  (JSON de una cuenta de servicio con Firebase Hosting Admin + API Keys Viewer; pasos en el README,
+  "Monthly update"); `trap` borra la credencial aunque falle. `firebase-tools` fijo en 15.28.1
+  (`FIREBASE_TOOLS_VERSION`). El cron publica; el disparo manual solo si se tilda *publicar* (default no).
+  Antes de actualizar corre `tools/test_comun.py`. `tools/cdp.mjs` busca Chrome en `CHROME_PATH` y rutas de Linux/macOS; en CI Linux usa
+  `--no-sandbox`.
 
 ## Reglas del dominio (no negociables)
 - **La clave de pozo es `idpozo`, NUNCA la sigla.** La sigla no es única (85.380 idpozo vs 78.128 siglas;

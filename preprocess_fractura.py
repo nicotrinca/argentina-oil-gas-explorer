@@ -18,7 +18,9 @@ import json
 
 import pandas as pd
 
-YEARS = [2022, 2023, 2024, 2025, 2026]
+from comun import anios_produccion, ultimo_mes_produccion
+
+YEARS = anios_produccion()
 MIN_POZOS_EMPRESA = 15
 # Equivalencia energética 6:1 (6 Mcf de gas = 1 bbl): 1 m³ de petróleo = 1.069 m³ de gas.
 # La producción de gas viene en Mm³ (miles de m³) -> m³ equivalentes de petróleo:
@@ -49,7 +51,7 @@ fr = pd.DataFrame({
 print(f"  {len(f):,} campañas -> {len(fr):,} pozos fracturados")
 
 # ── Producción mensual de esos pozos ────────────────────────────────────────
-print("Cargando producción mensual 2022-2026 (solo pozos fracturados)...")
+print(f"Cargando producción mensual {YEARS[0]}-{YEARS[-1]} (solo pozos fracturados)...")
 prod = pd.concat(
     pd.read_csv(f"data/produccion-{yr}.csv", usecols=["idpozo", "anio", "mes", "prod_pet", "prod_gas"],
                 encoding="utf-8-sig", low_memory=False).query("idpozo in @fr.index")
@@ -57,9 +59,9 @@ prod = pd.concat(
 )
 prod["periodo"] = pd.PeriodIndex.from_fields(year=prod["anio"], month=prod["mes"], freq="M")
 prod = prod.groupby(["idpozo", "periodo"])[["prod_pet", "prod_gas"]].sum().reset_index()
-# último mes con datos reales (el mes en curso todavía no se informó)
-tot = prod.groupby("periodo")["prod_pet"].sum()
-ultimo = tot[tot > tot.max() * 0.5].index.max()
+# último mes completo de TODA la producción (regla compartida de comun.py: meses finales con < 90 %
+# de los pozos del mes anterior = incompletos). Se calcula sobre todos los pozos, no solo los fracturados.
+ultimo = ultimo_mes_produccion()
 primero = prod["periodo"].min()
 print(f"  producción {primero} .. {ultimo}")
 
