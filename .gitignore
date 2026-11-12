@@ -23,3 +23,7 @@ outputs/
 *.cpg
 *.sbn
 *.sbx
+
+# Firebase Hosting (public/ se arma con node tools/build_public.mjs)
+public/
+.firebase/

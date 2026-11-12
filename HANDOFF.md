@@ -8,6 +8,16 @@ Visor web de pozos y producción de hidrocarburos de Argentina (Capítulo IV, Se
 Python (pandas/geopandas) preprocesa los CSV/shapefiles oficiales a archivos livianos en `data/`;
 `index.html` (un solo archivo, JS vanilla + Leaflet + markercluster + Chart.js, sin build) los muestra.
 GitHub: nicotrinca/argentina-oil-gas-explorer. Todo `data/` está en `.gitignore` (se regenera).
+Publicado en **https://pozos-argentina.web.app** (Firebase Hosting, proyecto `pozos-argentina`, plan gratis).
+
+## Cómo publicar
+- `firebase deploy --only hosting` desde la raíz (solo con OK del usuario y `tools/check.mjs` en verde).
+  El `predeploy` corre `node tools/build_public.mjs`, que arma `public/` (ignorado por git) con `index.html` +
+  una **whitelist** de `data/` (~31 MB; los `pozos_<año>.js` salen de los `<option>` de `#f-year`). Si agregás
+  un archivo de datos que el visor pide, sumalo a la whitelist (el script avisa si ve uno sin listar).
+- Headers: `index.html` no-cache; `data/**` max-age 1 h (tras un deploy, datos viejos pueden durar hasta 1 h).
+- Probar el sitio publicado: `POZOS_URL=https://pozos-argentina.web.app/ node tools/check.mjs`
+  (contra la red puede fallar algún chequeo por tiempos; repetir antes de alarmarse).
 
 ## Cómo correrlo
 - `abrir.bat` (doble clic) levanta `python -m http.server 8765` y abre http://localhost:8765.
@@ -102,6 +112,8 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
   empalme optimista). Pestaña "Curvas" y sección "Declinación" en el popup. Arreglos de paso: encabezado fijo
   del popup, unidad de gas en las barras del popup (/1000 de más), letra chica, scroll horizontal en Geo,
   `.catch` de ranking.json, aviso ámbar de ajuste pobre (r² < 0,6). check.mjs: 30 chequeos.
+- 2026-11-11: publicado en Firebase Hosting (pozos-argentina.web.app): `tools/build_public.mjs`, `firebase.json`
+  con predeploy, `.firebaserc`; línea de atribución a la Secretaría de Energía (CC-BY 4.0) en el encabezado.
 
 ## Pendiente conocido
 - Concesiones solapadas: LOMA LA LATA - SIERRA BARROSA y LA ANGOSTURA SUR I salen con los mismos 57 pozos.
