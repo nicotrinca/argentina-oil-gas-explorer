@@ -41,43 +41,76 @@
   ::-webkit-scrollbar-thumb:hover { background: #3a4262; }
 
   /* ── Sidebar ── */
+  /* Ancho del panel: lo fija el JS en --sb-w (px) según la pestaña y lo que el usuario arrastró
+     (ver aplicarAnchoPanel). Los valores por defecto de acá son solo el respaldo antes de que corra el JS:
+     pestaña Mapa ≈ 40 % del viewport; el resto (body.sb-wide) ≈ 60 %. */
   #sidebar {
-    width: 350px; min-width: 320px; background: var(--panel); color: var(--text);
+    width: var(--sb-w, clamp(460px, 40vw, 640px)); min-width: 320px; max-width: 100vw; flex-shrink: 0;
+    background: var(--panel); color: var(--text);
     display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 16px #0009;
   }
+  body.sb-wide #sidebar { width: var(--sb-w, clamp(560px, 60vw, 66vw)); }
+  /* "Ampliar": el panel ocupa todo el ancho y el mapa se oculta */
+  body.sb-full #sidebar { width: 100vw; }
+  body.sb-full #map, body.sb-full #sb-divisor { display: none; }
+  /* Divisor arrastrable entre panel y mapa */
+  #sb-divisor {
+    flex: 0 0 8px; cursor: col-resize; background: var(--panel-3); position: relative; z-index: 1001;
+    touch-action: none; border-left: 1px solid #0006; border-right: 1px solid #0006;
+  }
+  #sb-divisor::after {
+    content: ''; position: absolute; left: 2px; right: 2px; top: 50%; height: 40px; margin-top: -20px;
+    border-left: 2px dotted var(--text-mute); border-right: 2px dotted var(--text-mute); opacity: .7;
+  }
+  #sb-divisor:hover, #sb-divisor:focus-visible, body.sb-arrastrando #sb-divisor { background: var(--accent-dk); outline: none; }
+  body.sb-arrastrando { cursor: col-resize; user-select: none; }
+  body.sb-arrastrando #map { pointer-events: none; }
   #sidebar header {
     background: linear-gradient(135deg, #0d3b6e, #1f78b4);
-    padding: 18px 18px 14px; flex-shrink: 0;
+    padding: 12px 16px 10px; flex-shrink: 0;
   }
+  .sb-head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
   #sidebar header h1 { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: .2px; }
-  #sidebar header p  { font-size: 14px; color: #bcdcf6; margin-top: 4px; }
+  #sidebar header p  { font-size: 14px; color: #bcdcf6; margin-top: 2px; }
   #sidebar header p.fuente a { color: #fff; }
+  #btn-ampliar {
+    flex-shrink: 0; padding: 7px 12px; background: #ffffff1f; color: #fff; border: 1px solid #ffffff55;
+    border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap;
+  }
+  #btn-ampliar:hover { background: #ffffff33; }
+  /* En la pestaña Mapa no tiene sentido ocultar el mapa */
+  body:not(.sb-wide) #btn-ampliar { display: none; }
 
   /* ── Totales ── */
+  /* Los 4 KPIs en una fila; con el panel muy angosto pasan a 2 × 2 (sin achicar letra) */
   #totales {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-    padding: 14px; background: #14171f; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+    padding: 10px 14px; background: #14171f; border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
   .stat-box {
-    background: var(--panel-2); border-radius: 9px; padding: 11px 12px; text-align: center;
-    border: 1px solid #2a3046;
+    background: var(--panel-2); border-radius: 9px; padding: 8px 6px; text-align: center;
+    border: 1px solid #2a3046; min-width: 0;
   }
-  .stat-box .val { font-size: 24px; font-weight: 700; color: var(--accent); line-height: 1.1; }
-  .stat-box .lbl { font-size: 13px; color: var(--text-mute); margin-top: 5px; }
+  .stat-box .val { font-size: 24px; font-weight: 700; color: var(--accent); line-height: 1.1;
+    white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .stat-box .lbl { font-size: 14px; color: var(--text-mute); margin-top: 4px; line-height: 1.25; }
+  @container sb (max-width: 440px) {
+    #totales { grid-template-columns: 1fr 1fr; }
+  }
 
   /* ── Tabs ── */
-  /* Con 5 pestañas no entran en una fila del sidebar angosto (350 px): pasan a 2 filas (3 + 2),
-     sin achicar letra ni espaciado. Con el sidebar ancho (pestaña Curvas) van en una sola fila. */
+  /* Las 5 pestañas van en una fila. Solo si el usuario angosta el panel por debajo de ~440 px
+     pasan a 2 filas (3 + 2), sin achicar letra ni espaciado. */
   #sidebar { container-type: inline-size; container-name: sb; }
   #tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .tab-btn {
-    flex: 1 1 auto; padding: 13px 8px; background: none; border: none; color: var(--text-mute);
+    flex: 1 1 auto; padding: 13px 6px; background: none; border: none; color: var(--text-mute);
     font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: .4px; white-space: nowrap;
     text-transform: uppercase; border-bottom: 2px solid transparent; transition: all .15s;
   }
   .tab-btn:hover { color: var(--text-dim); background: #ffffff08; }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-  @container sb (max-width: 600px) {
+  @container sb (max-width: 440px) {
     #tabs .tab-btn { flex: 1 0 30%; }
     #tabs .tab-btn:nth-child(n+4) { flex-basis: 45%; border-top: 1px solid #ffffff10; }
   }
@@ -131,31 +164,33 @@
     transition: background .15s;
   }
   #btn-reset:hover { background: #1e5c99; }
-  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-mute); margin: 14px 0 8px; font-weight: 700; }
+  .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-mute); margin: 14px 0 8px; font-weight: 700; }
   .cuenca-row { padding: 9px 8px; border-radius: 7px; cursor: pointer; transition: background .15s; }
   .cuenca-row:hover { background: var(--panel-2); }
   .cuenca-row.active { background: var(--accent-bg); }
   .cuenca-row .cname { font-size: 15px; font-weight: 600; color: var(--text-dim); }
   .cuenca-row .cbar-wrap { height: 5px; background: var(--panel-2); border-radius: 3px; margin: 6px 0; }
   .cuenca-row .cbar { height: 5px; border-radius: 3px; background: linear-gradient(90deg, #f0a000, #e03020); }
-  .cuenca-row .cstats { font-size: 12px; color: var(--text-mute); display: flex; gap: 10px; }
+  .cuenca-row .cstats { font-size: 14px; color: var(--text-mute); display: flex; flex-wrap: wrap; gap: 2px 12px;
+    font-variant-numeric: tabular-nums; }
+  .cuenca-row .cstats span { white-space: nowrap; }
 
   /* ── Tendencia ── */
   #tab-tendencia { padding: 16px; gap: 12px; }
   #tab-tendencia .section-title { margin-top: 0; }
   .chart-wrap { background: #14171f; border-radius: 9px; padding: 13px; border: 1px solid #2a3046; }
   .chart-wrap canvas { width: 100% !important; }
-  .chart-label { font-size: 12px; color: var(--text-mute); margin-bottom: 8px; }
+  .chart-label { font-size: 14px; color: var(--text-mute); margin-bottom: 8px; }
   .cuenca-selector { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .cuenca-chip {
-    padding: 6px 12px; border-radius: 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+    padding: 6px 12px; border-radius: 14px; font-size: 14px; font-weight: 500; cursor: pointer;
     background: var(--panel-2); color: var(--text-mute); border: 1px solid var(--border); transition: all .15s;
   }
   .cuenca-chip:hover { color: var(--text-dim); }
   .cuenca-chip.active { color: #fff; border-color: transparent; }
   .metric-btn {
     flex: 1; padding: 9px; background: var(--panel-2); color: var(--text-mute);
-    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s;
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .15s;
   }
   .metric-btn:hover { color: var(--text-dim); }
   .metric-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
@@ -196,19 +231,24 @@
   #tab-ranking { padding: 14px; gap: 0; }
   .rank-btn {
     flex: 1; padding: 9px 5px; background: var(--panel-2); color: var(--text-mute);
-    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s;
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .15s;
+    white-space: nowrap;
   }
   .rank-btn:hover { color: var(--text-dim); }
   .rank-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+  /* Fila de ranking: n° | nombre (se trunca con … y title) | valor en columna fija a la derecha, nunca cortado.
+     minmax(0, 1fr) deja que el nombre ceda espacio; max-content asegura el ancho completo de la cifra. */
   .rank-row {
-    padding: 11px 5px; border-bottom: 1px solid #232838; cursor: pointer;
-    display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center;
+    padding: 10px 6px; border-bottom: 1px solid #232838; cursor: pointer;
+    display: grid; grid-template-columns: 2.2em minmax(0, 1fr) max-content; gap: 10px; align-items: center;
   }
   .rank-row:hover { background: var(--panel-2); }
-  .rank-num { font-size: 14px; font-weight: 700; color: #56688a; text-align: right; }
-  .rank-info .rname { font-size: 14px; font-weight: 600; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rank-info .remp  { font-size: 13px; color: var(--text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rank-val { font-size: 14px; font-weight: 700; text-align: right; white-space: nowrap; }
+  .rank-num { font-size: 14px; font-weight: 700; color: #6a7ca0; text-align: right; font-variant-numeric: tabular-nums; }
+  .rank-info { min-width: 0; }
+  .rank-info .rname { font-size: 15px; font-weight: 600; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank-info .remp  { font-size: 14px; color: var(--text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .rank-val { font-size: 15px; font-weight: 700; text-align: right; white-space: nowrap; min-width: 6.5ch;
+    font-variant-numeric: tabular-nums; }
   .val-up   { color: var(--up); }
   .val-down { color: var(--down); }
   .val-neu  { color: var(--accent); }
@@ -216,16 +256,19 @@
   /* ── Geo ── */
   #tab-geo { padding: 16px; gap: 10px; }
   #tab-geo .section-title { margin: 6px 0 2px; }
-  .geo-note { font-size: 12px; color: var(--text-mute); line-height: 1.5; }
-  .band-row { display: grid; grid-template-columns: 78px 1fr 62px; gap: 8px; align-items: center; font-size: 13px; color: var(--text-dim); margin: 3px 0; }
+  .geo-note { font-size: 14px; color: var(--text-mute); line-height: 1.5; }
+  .band-row { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 8px; align-items: center;
+    font-size: 14px; color: var(--text-dim); margin: 3px 0; font-variant-numeric: tabular-nums; }
+  .band-row > span:first-child { min-width: 78px; white-space: nowrap; }
   .band-bar { height: 9px; border-radius: 3px; background: var(--panel-2); position: relative; }
   .band-bar div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
-  .band-row .pct { text-align: right; color: var(--text-mute); font-size: 12px; }
+  .band-row .pct { text-align: right; color: var(--text-mute); font-size: 14px; white-space: nowrap; }
   .table-scroll { max-width: 100%; overflow-x: auto; flex-shrink: 0; }
   .table-scroll .geo-table th { white-space: normal; vertical-align: bottom; }
   .geo-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .geo-table th { text-align: right; color: var(--text-mute); font-weight: 600; padding: 5px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .geo-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #232838; color: var(--text-dim); white-space: nowrap; }
+  .geo-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #232838; color: var(--text-dim); white-space: nowrap;
+    font-variant-numeric: tabular-nums; }
   .geo-table th:first-child, .geo-table td:first-child { text-align: left; white-space: normal; }
   .geo-table td.hi { color: var(--accent); font-weight: 700; }
   .qa-row { padding: 9px 6px; border-bottom: 1px solid #232838; cursor: pointer; font-size: 13px; }
@@ -235,7 +278,6 @@
   .warn { color: #c0392b; font-weight: 700; }
 
   /* ── Curvas (curvas tipo y EUR) ── */
-  body.sb-wide #sidebar { width: min(1000px, 66vw); }
   #tab-curvas { padding: 16px; gap: 10px; }
   #tab-curvas > * { flex-shrink: 0; }
   #tab-curvas .section-title { margin: 8px 0 2px; }
@@ -275,8 +317,29 @@
   #map.zonas-on .leaflet-marker-pane .leaflet-marker-icon > div { opacity: .5; transition: opacity .15s; }
   #map.zonas-on .leaflet-marker-pane .leaflet-marker-icon:hover > div { opacity: 1; }
   #tab-curvas .int-pie { color: var(--text-dim); }
+  /* Botón flotante "Ver mapa / Ver panel": solo en celular */
+  #btn-movil { display: none; }
+  /* Celular: el panel ocupa toda la pantalla en todas las pestañas (incluida Mapa). El botón flotante alterna
+     panel ↔ mapa a pantalla completa (body.m-mapa). Sin divisor ni "Ampliar" (sb-full no se usa acá). */
   @media (max-width: 760px) {
-    body.sb-wide #sidebar { width: 100vw; min-width: 0; }
+    #sidebar, body.sb-wide #sidebar, body.sb-full #sidebar { width: 100vw; min-width: 0; }
+    body.sb-full #map { display: block; }
+    body.m-mapa #sidebar { display: none; }
+    #sb-divisor, #btn-ampliar { display: none !important; }
+    #btn-movil {
+      display: block; position: fixed; z-index: 1500; left: 50%; transform: translateX(-50%);
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px)); min-height: 48px; padding: 0 26px;
+      background: var(--accent); color: #0a1420; border: 2px solid #0a1420; border-radius: 24px;
+      font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px #000a; white-space: nowrap;
+    }
+    /* Que el botón no tape el final del panel */
+    #sidebar .tab-pane.active { padding-bottom: 84px; }
+    /* Con el mapa a pantalla completa, la leyenda y la atribución suben por encima del botón */
+    body.m-mapa .leaflet-bottom { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+    .leaflet-control-layers { max-width: calc(100vw - 70px); }
+    #anim-control { min-width: 0; max-width: calc(100vw - 20px); }
+    /* En touch no hay tooltip (title): empresa · cuenca hace wrap en vez de cortarse con "…" */
+    .rank-info .remp { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
   }
   /* Declinación en el popup (fondo blanco de Leaflet) */
   .decl-txt { font-size: 14px; color: #1a2533; margin-top: 4px; line-height: 1.4; }
@@ -368,8 +431,13 @@ if (location.protocol === 'file:') document.addEventListener('DOMContentLoaded',
 
 <div id="sidebar">
   <header>
-    <h1>Pozos Petroleros — Argentina</h1>
-    <p>Capítulo IV · 2022–2026</p>
+    <div class="sb-head-top">
+      <div>
+        <h1>Pozos Petroleros — Argentina</h1>
+        <p>Capítulo IV · 2022–2026</p>
+      </div>
+      <button id="btn-ampliar" type="button" aria-pressed="false" title="Ocultar el mapa y usar todo el ancho para el panel">Ampliar</button>
+    </div>
     <p class="fuente">Datos: Secretaría de Energía de la Nación (<a href="http://datos.energia.gob.ar/dataset/produccion-de-petroleo-y-gas-por-pozo" target="_blank" rel="noopener">datos.energia.gob.ar</a>, CC-BY 4.0)</p>
   </header>
 
@@ -573,7 +641,10 @@ if (location.protocol === 'file:') document.addEventListener('DOMContentLoaded',
   </div>
 </div>
 
+<div id="sb-divisor" role="separator" aria-orientation="vertical" aria-controls="sidebar" tabindex="0"
+     title="Arrastrá para cambiar el ancho del panel · doble clic: ancho por defecto"></div>
 <div id="map"></div>
+<button id="btn-movil" type="button" aria-pressed="false">Ver mapa</button>
 <!-- Rayado para hexágonos con pocos pozos (capa Zonas productivas VM): fill="url(#zonas-rayado)" -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <pattern id="zonas-rayado" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -594,7 +665,9 @@ const I = { lat:0, lon:1, pet:2, gas:3, agua:4, emp:5, cu:6, prov:7, tr:8, form:
 const CUENCA_COLORS = ['#4db6f0','#e07020','#50e080','#f0c040','#e050b0','#a070f0','#50c0c0','#f08080'];
 
 Chart.defaults.color = '#93a1c2';
-Chart.defaults.font.size = 13;
+Chart.defaults.font.size = 14;
+// Letra de ejes, leyendas y tooltips de los gráficos del panel (Tendencia, Geo): mínimo 14 px, como Curvas
+const CH_F = { size: 14 };
 Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
 
 // ── Mapa ──────────────────────────────────────────────────────────────────
@@ -1265,11 +1338,11 @@ function buildNacionalChart() {
     },
     options: {
       animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { titleFont: { size: 9 }, bodyFont: { size: 9 } } },
+      plugins: { legend: { labels: { boxWidth: 14, font: CH_F } }, tooltip: { titleFont: CH_F, bodyFont: CH_F } },
       scales: {
-        x:  { ticks: { maxTicksLimit: 8, font: { size: 8 } }, grid: { color: '#2a2f42' } },
-        y1: { position: 'left',  ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
-        y2: { position: 'right', ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { drawOnChartArea: false } },
+        x:  { ticks: { maxTicksLimit: 8, font: CH_F }, grid: { color: '#2a2f42' } },
+        y1: { position: 'left',  ticks: { font: CH_F, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
+        y2: { position: 'right', ticks: { font: CH_F, callback: v => fmtM(v) }, grid: { drawOnChartArea: false } },
       }
     }
   });
@@ -1326,10 +1399,10 @@ function updateCuencaChart() {
     data: { labels, datasets },
     options: {
       animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { titleFont: { size: 9 }, bodyFont: { size: 9 } } },
+      plugins: { legend: { labels: { boxWidth: 14, font: CH_F } }, tooltip: { titleFont: CH_F, bodyFont: CH_F } },
       scales: {
-        x: { ticks: { maxTicksLimit: 8, font: { size: 8 } }, grid: { color: '#2a2f42' } },
-        y: { ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
+        x: { ticks: { maxTicksLimit: 8, font: CH_F }, grid: { color: '#2a2f42' } },
+        y: { ticks: { font: CH_F, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
       }
     }
   });
@@ -1383,10 +1456,10 @@ function updateEmpresaChart() {
     data: { labels, datasets },
     options: {
       animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { titleFont: { size: 9 }, bodyFont: { size: 9 } } },
+      plugins: { legend: { labels: { boxWidth: 14, font: CH_F } }, tooltip: { titleFont: CH_F, bodyFont: CH_F } },
       scales: {
-        x: { ticks: { maxTicksLimit: 8, font: { size: 8 } }, grid: { color: '#2a2f42' } },
-        y: { ticks: { font: { size: 8 }, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
+        x: { ticks: { maxTicksLimit: 8, font: CH_F }, grid: { color: '#2a2f42' } },
+        y: { ticks: { font: CH_F, callback: v => fmtM(v) }, grid: { color: '#2a2f42' } },
       }
     }
   });
@@ -1410,18 +1483,135 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'geo') buildGeoTab();
-    const ancho = btn.dataset.tab === 'curvas';
-    if (document.body.classList.contains('sb-wide') !== ancho) {
-      document.body.classList.toggle('sb-wide', ancho);
-      setTimeout(() => map.invalidateSize(), 60);
-    }
-    if (btn.dataset.tab === 'curvas') buildCurvasTab();
-    if (btn.dataset.tab === 'tendencia' && chartNac) {
-      setTimeout(() => { chartNac.resize(); if (chartCuenca) chartCuenca.resize(); if (chartEmpresa) chartEmpresa.resize(); }, 50);
-    }
+    sbTab = btn.dataset.tab;
+    // Al volver a Mapa, el mapa siempre se ve
+    if (sbTab === 'filtros' && document.body.classList.contains('sb-full')) setAmpliado(false);
+    aplicarAnchoPanel();
+    if (sbTab === 'geo') buildGeoTab();
+    if (sbTab === 'curvas') buildCurvasTab();
   });
 });
+
+// ── Ancho del panel lateral ─────────────────────────────────────────────────
+// Pestaña Mapa ≈ 40 % del viewport (460–640 px); las demás (body.sb-wide) ≈ 60 % (mín. 560 px).
+// El divisor permite cambiarlo; el ancho elegido se recuerda POR PESTAÑA en localStorage (si falla, default).
+// "Ampliar" (body.sb-full) oculta el mapa; al volver a la pestaña Mapa se restaura.
+const SB_MIN = 320, MAPA_MIN = 280, SB_CLAVE = 'pozos.anchoPanel';
+let sbTab = 'filtros';
+let sbAnchos = {};
+try {
+  const g = JSON.parse(localStorage.getItem(SB_CLAVE) || '{}');
+  // Solo un objeto plano {pestaña: px}; cualquier otra cosa ("5", "[]", null) se descarta
+  sbAnchos = g && typeof g === 'object' && !Array.isArray(g) ? g : {};
+} catch (e) { sbAnchos = {}; }
+let sbRelayoutTimer = null;
+
+const sbMovil = () => window.matchMedia('(max-width: 760px)').matches;
+function sbDefault(tab) {
+  const w = window.innerWidth;
+  return tab === 'filtros' ? Math.min(640, Math.max(460, w * 0.4)) : Math.max(560, Math.min(w * 0.6, w * 0.66));
+}
+// Panel ≥ 320 px; el mapa ≥ 280 px descontando el ancho del divisor
+function sbLimitar(px) {
+  const div = document.getElementById('sb-divisor');
+  const dw = div && div.offsetWidth ? div.offsetWidth : 8;
+  return Math.floor(Math.max(SB_MIN, Math.min(px, window.innerWidth - MAPA_MIN - dw)));
+}
+function sbGuardar() { try { localStorage.setItem(SB_CLAVE, JSON.stringify(sbAnchos)); } catch (e) { } }
+
+function aplicarAnchoPanel() {
+  const sb = document.getElementById('sidebar');
+  document.body.classList.toggle('sb-wide', sbTab !== 'filtros');
+  if (sbMovil()) {
+    sb.style.removeProperty('--sb-w');
+    // En celular no existe "Ampliar": que no quede sb-full colgado al angostar la ventana
+    if (document.body.classList.contains('sb-full')) setAmpliado(false);
+  } else {
+    // Y en escritorio no existe el modo mapa a pantalla completa del celular
+    if (document.body.classList.contains('m-mapa')) setMovilMapa(false);
+    const g = +sbAnchos[sbTab];
+    sb.style.setProperty('--sb-w', sbLimitar(g > 0 ? g : sbDefault(sbTab)) + 'px');
+  }
+  relayoutPanel();
+}
+
+// Celular: botón flotante que alterna panel (100vw) ↔ mapa a pantalla completa (body.m-mapa).
+// Es el inverso de "Ampliar" de escritorio (ahí se oculta el mapa; acá el panel), por eso usa su propia clase.
+function setMovilMapa(on) {
+  const mapa = !!on && sbMovil();
+  document.body.classList.toggle('m-mapa', mapa);
+  const b = document.getElementById('btn-movil');
+  b.textContent = mapa ? 'Ver panel' : 'Ver mapa';
+  b.title = mapa ? 'Volver al panel (filtros, gráficos, ranking)' : 'Ver el mapa a pantalla completa';
+  b.setAttribute('aria-pressed', mapa ? 'true' : 'false');
+  if (mapa) map.invalidateSize();
+  relayoutPanel(0);
+}
+document.getElementById('btn-movil').addEventListener('click', () =>
+  setMovilMapa(!document.body.classList.contains('m-mapa')));
+
+// Tras un cambio de ancho: Leaflet no se entera solo (invalidateSize) y los Chart.js visibles se redibujan.
+// Con debounce para no hacerlo en cada pixel del arrastre.
+function relayoutPanel(ms = 60) {
+  clearTimeout(sbRelayoutTimer);
+  sbRelayoutTimer = setTimeout(() => requestAnimationFrame(() => {
+    // Con el mapa oculto (Ampliar, o panel a pantalla completa en celular) no se recalcula: Leaflet con 0 px corre el centro
+    if (map.getContainer().offsetWidth > 0) map.invalidateSize();
+    [chartNac, chartCuenca, chartEmpresa, chartFrac, chartCurvas, chartEur, chartIntCoh, chartIntTramo]
+      .forEach(c => { if (c && c.canvas && c.canvas.offsetParent) c.resize(); });
+  }), ms);
+}
+
+function setAmpliado(on) {
+  document.body.classList.toggle('sb-full', on);
+  const b = document.getElementById('btn-ampliar');
+  b.textContent = on ? 'Ver mapa' : 'Ampliar';
+  b.title = on ? 'Volver a mostrar el mapa' : 'Ocultar el mapa y usar todo el ancho para el panel';
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  relayoutPanel();
+}
+document.getElementById('btn-ampliar').addEventListener('click', () =>
+  setAmpliado(!document.body.classList.contains('sb-full')));
+
+// Divisor arrastrable (pointer events: mouse, lápiz y touch)
+(() => {
+  const div = document.getElementById('sb-divisor'), sb = document.getElementById('sidebar');
+  let x0 = 0, w0 = 0, activo = false, movido = false;
+  const fijar = w => { sb.style.setProperty('--sb-w', sbLimitar(w) + 'px'); relayoutPanel(120); };
+  div.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    activo = true; movido = false; x0 = e.clientX; w0 = sb.getBoundingClientRect().width;
+    try { div.setPointerCapture(e.pointerId); } catch (err) { }
+    document.body.classList.add('sb-arrastrando');
+    e.preventDefault();
+  });
+  div.addEventListener('pointermove', e => {
+    if (!activo) return;
+    if (Math.abs(e.clientX - x0) > 2) movido = true;
+    if (movido) fijar(w0 + e.clientX - x0);
+  });
+  const fin = () => {
+    if (!activo) return;
+    activo = false;
+    document.body.classList.remove('sb-arrastrando');
+    if (movido) { sbAnchos[sbTab] = Math.round(sb.getBoundingClientRect().width); sbGuardar(); }
+    relayoutPanel(0);
+  };
+  div.addEventListener('pointerup', fin);
+  div.addEventListener('pointercancel', fin);
+  div.addEventListener('lostpointercapture', fin);
+  // Doble clic: volver al ancho por defecto de la pestaña
+  div.addEventListener('dblclick', () => { delete sbAnchos[sbTab]; sbGuardar(); aplicarAnchoPanel(); });
+  // Teclado: flechas ±20 px (para quien no usa el mouse)
+  div.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    fijar(sb.getBoundingClientRect().width + (e.key === 'ArrowRight' ? 20 : -20));
+    sbAnchos[sbTab] = Math.round(sb.getBoundingClientRect().width); sbGuardar();
+  });
+})();
+let sbResizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(sbResizeTimer); sbResizeTimer = setTimeout(aplicarAnchoPanel, 120); });
 
 // ── Eventos filtros ───────────────────────────────────────────────────────
 ['f-cuenca','f-prov','f-emp','f-tipo'].forEach(id =>
@@ -1477,8 +1667,8 @@ function renderRanking(key) {
     row.innerHTML = `
       <div class="rank-num">${i+1}</div>
       <div class="rank-info">
-        <div class="rname">${r.sigla}</div>
-        <div class="remp">${r.empresa} · ${r.cuenca}</div>
+        <div class="rname" title="${escAttr(r.sigla)}">${r.sigla}</div>
+        <div class="remp" title="${escAttr(r.empresa + ' · ' + r.cuenca)}">${r.empresa} · ${r.cuenca}</div>
       </div>
       <div class="rank-val ${cls}">${val}</div>`;
     row.addEventListener('click', () => flyToPozo(r.id));
@@ -1490,6 +1680,8 @@ function flyToPozo(id) {
   const row = window.POZOS.find(r => r[I.id] === +id);
   if (!row) return;
   document.querySelector('[data-tab="filtros"]').click();
+  // En celular, mostrar el mapa a pantalla completa
+  if (sbMovil()) setMovilMapa(true);
   const ll = [row[I.lat], row[I.lon]];
   map.invalidateSize();
   try { map.flyTo(ll, 14, { duration: 1.2 }); } catch (e) { map.setView(ll, 14); }
@@ -1676,6 +1868,7 @@ function fracPopupHTML(id) {
 function flyToLatLon(id, sigla, lat, lon) {
   if (window.POZOS.some(r => r[I.id] === id)) return flyToPozo(id);
   document.querySelector('[data-tab="filtros"]').click();
+  if (sbMovil()) setMovilMapa(true);
   map.invalidateSize();
   try { map.flyTo([lat, lon], 13, { duration: 1.2 }); } catch (e) { map.setView([lat, lon], 13); }
   L.popup({ maxWidth: 290 }).setLatLng([lat, lon])
@@ -1727,13 +1920,13 @@ function buildGeoTab() {
       },
       options: {
         animation: false, responsive: true, interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } },
+        plugins: { legend: { labels: { boxWidth: 14, font: CH_F } },
                    tooltip: { callbacks: { label: c => c.dataset.label === 'Etapas ×50'
                      ? `Etapas: ${c.raw / 50}` : `${c.dataset.label}: ${fmtNum(c.raw)}` } } },
         scales: {
-          x:  { ticks: { font: { size: 9 } }, grid: { color: '#2a2f42' } },
-          y1: { position: 'left', ticks: { font: { size: 9 } }, grid: { color: '#2a2f42' } },
-          y2: { position: 'right', ticks: { font: { size: 9 }, callback: v => fmtM(v) }, grid: { drawOnChartArea: false } },
+          x:  { ticks: { font: CH_F }, grid: { color: '#2a2f42' } },
+          y1: { position: 'left', ticks: { font: CH_F }, grid: { color: '#2a2f42' } },
+          y2: { position: 'right', ticks: { font: CH_F, callback: v => fmtM(v) }, grid: { drawOnChartArea: false } },
         },
       },
     });
@@ -2398,7 +2591,13 @@ function fmtM(n) {
   return (+n).toFixed(0);
 }
 
+// Texto seguro para atributos HTML (title="…")
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ── Init (al final, cuando ya están definidas todas las funciones y vars) ───
+aplicarAnchoPanel();
 populateFilters();
 loadCuencasPanel();
 applyFilters();

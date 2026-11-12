@@ -270,6 +270,91 @@ try {
     const b = [...document.querySelectorAll('#tabs .tab-btn')].filter(x => x.scrollWidth > x.clientWidth + 1);
     return {ok: b.length === 0, info: document.getElementById('tabs').offsetHeight + ' px de alto', mal: b.map(x => x.textContent)}; })()`);
 
+  // ── Ancho del panel lateral, divisor y "Ampliar" ──
+  await check("panel: Mapa ≈ 40 % y Ranking ≈ 60 % del ancho; 5 pestañas y 4 KPIs en una fila", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    const sb = document.getElementById('sidebar'), W = innerWidth;
+    const filas = sel => new Set([...document.querySelectorAll(sel)].map(e => Math.round(e.getBoundingClientRect().top))).size;
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(300);
+    const wMapa = sb.offsetWidth, tabsMapa = filas('#tabs .tab-btn'), kpis = filas('#totales .stat-box');
+    const kpiCortado = [...document.querySelectorAll('#totales .val')].some(e => e.scrollWidth > e.clientWidth + 1);
+    document.querySelector('.tab-btn[data-tab="ranking"]').click(); await espera(300);
+    const wRank = sb.offsetWidth, tabsRank = filas('#tabs .tab-btn'), mapaW = document.getElementById('map').offsetWidth;
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(300);
+    return {ok: wRank > wMapa + 100 && Math.abs(wMapa - Math.min(640, Math.max(460, W * 0.4))) <= 2
+      && Math.abs(wRank - Math.max(560, W * 0.6)) <= 2 && mapaW >= 280 && tabsMapa === 1 && tabsRank === 1 && kpis === 1 && !kpiCortado,
+      info: 'viewport ' + W + ' · Mapa ' + wMapa + ' px · Ranking ' + wRank + ' px (mapa ' + mapaW + ' px) · pestañas '
+        + tabsMapa + '/' + tabsRank + ' fila(s) · KPIs ' + kpis + ' fila(s)'}; })()`);
+
+  await check("ranking: ninguna cifra recortada (ancho por defecto y panel a 320 px); nombres con … y title", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('.tab-btn[data-tab="ranking"]').click();
+    for (let i = 0; i < 40 && !document.querySelector('#ranking-list .rank-row'); i++) await espera(250);
+    const sb = document.getElementById('sidebar');
+    const medir = () => { const filas = [...document.querySelectorAll('#ranking-list .rank-row')];
+      const mal = filas.filter(f => { const v = f.querySelector('.rank-val'), rv = v.getBoundingClientRect(), rf = f.getBoundingClientRect();
+        return v.scrollWidth > v.clientWidth || rv.right > rf.right + 0.5 || rv.left < f.querySelector('.rank-info').getBoundingClientRect().right; });
+      return {n: filas.length, mal: mal.map(f => f.querySelector('.rname').textContent + ' ' + f.querySelector('.rank-val').textContent)}; };
+    const res = {};
+    for (const k of ['top_productores', 'top_crecimiento', 'top_caida']) {
+      document.querySelector('.rank-btn[data-rank="' + k + '"]').click(); await espera(100);
+      res[k] = medir();
+      sb.style.setProperty('--sb-w', '320px'); await espera(100);
+      res[k + '@320'] = medir();
+      aplicarAnchoPanel(); await espera(100);
+    }
+    document.querySelector('.rank-btn[data-rank="top_productores"]').click();
+    const titulos = [...document.querySelectorAll('#ranking-list .rname')].every(e => e.title === e.textContent);
+    const elip = getComputedStyle(document.querySelector('#ranking-list .remp')).textOverflow === 'ellipsis';
+    const fs = Math.min(...['.rname', '.remp', '.rank-val'].map(s => parseFloat(getComputedStyle(document.querySelector('#ranking-list ' + s)).fontSize)));
+    document.querySelector('.tab-btn[data-tab="filtros"]').click();
+    const malos = Object.entries(res).filter(([k, v]) => v.mal.length || !v.n);
+    return {ok: malos.length === 0 && titulos && elip && fs >= 14,
+      info: Object.entries(res).map(([k, v]) => k + ' ' + v.n + ' filas').join(' · ') + ' · letra mín. ' + fs + ' px',
+      mal: malos.map(([k, v]) => k + ': ' + v.mal.slice(0, 3).join(', '))}; })()`);
+
+  await check("Ampliar oculta el mapa; 'Ver mapa' y la pestaña Mapa lo restauran", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    const btn = document.getElementById('btn-ampliar'), m = document.getElementById('map'), sb = document.getElementById('sidebar');
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(200);
+    const ocultoEnMapa = btn.offsetWidth === 0;
+    document.querySelector('.tab-btn[data-tab="tendencia"]').click(); await espera(300);
+    btn.click(); await espera(400);
+    const a = {mapa: m.offsetWidth, panel: sb.offsetWidth, txt: btn.textContent};
+    btn.click(); await espera(400);
+    const b2 = {mapa: m.offsetWidth, txt: btn.textContent};
+    btn.click(); await espera(200);
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(400);
+    const c = {mapa: m.offsetWidth, full: document.body.classList.contains('sb-full')};
+    const mapOk = map.getSize().x === m.clientWidth;
+    return {ok: ocultoEnMapa && a.mapa === 0 && a.panel >= innerWidth - 1 && a.txt === 'Ver mapa'
+      && b2.mapa >= 280 && b2.txt === 'Ampliar' && c.mapa >= 280 && !c.full && mapOk,
+      info: 'ampliado: mapa ' + a.mapa + ' px, panel ' + a.panel + ' px · Ver mapa: ' + b2.mapa + ' px · pestaña Mapa: ' + c.mapa
+        + ' px · Leaflet ' + map.getSize().x + ' px'}; })()`);
+
+  await check("divisor: arrastrar cambia el ancho, se recuerda por pestaña y doble clic vuelve al default", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    const d = document.getElementById('sb-divisor'), sb = document.getElementById('sidebar');
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(200);
+    const w0 = sb.offsetWidth, r = d.getBoundingClientRect(), x = r.left + 4, y = r.top + 200;
+    const ev = (t, cx) => d.dispatchEvent(new PointerEvent(t, {bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+      button: 0, buttons: t === 'pointerup' ? 0 : 1, clientX: cx, clientY: y, isPrimary: true}));
+    ev('pointerdown', x); ev('pointermove', x - 40); ev('pointermove', x - 100); ev('pointerup', x - 100);
+    await espera(400);
+    const w1 = sb.offsetWidth, guardado = JSON.parse(localStorage.getItem('pozos.anchoPanel') || '{}').filtros;
+    const mapOk = map.getSize().x === document.getElementById('map').clientWidth;
+    document.querySelector('.tab-btn[data-tab="ranking"]').click(); await espera(200);
+    const wRank = sb.offsetWidth;
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(200);
+    const w2 = sb.offsetWidth;
+    ev('pointerdown', x - 100); ev('pointermove', x - 5000); ev('pointerup', x - 5000); await espera(200);
+    const wMin = sb.offsetWidth;
+    d.dispatchEvent(new MouseEvent('dblclick', {bubbles: true})); await espera(300);
+    const w3 = sb.offsetWidth, borrado = !('filtros' in JSON.parse(localStorage.getItem('pozos.anchoPanel') || '{}'));
+    return {ok: Math.abs(w1 - (w0 - 100)) <= 2 && guardado === w1 && mapOk && wRank !== w1 && w2 === w1 && wMin === 320 && w3 === w0 && borrado,
+      info: 'default ' + w0 + ' → arrastrado ' + w1 + ' (guardado ' + guardado + ') · Ranking ' + wRank + ' · vuelve a Mapa ' + w2
+        + ' · tope mín. ' + wMin + ' · doble clic ' + w3}; })()`);
+
   for (const tab of ["tendencia", "ranking", "geo", "curvas", "filtros"]) {
     await check(`pestaña ${tab} abre`, `(async () => {
       document.querySelector('.tab-btn[data-tab="${tab}"]').click();
@@ -353,6 +438,108 @@ try {
       document.querySelector('.tab-btn[data-tab="filtros"]').click();
       return res; })()`);
   }
+
+  await check("gráficos de Tendencia y Geo: ticks, leyendas y tooltips ≥ 14 px", `(async () => {
+    document.querySelector('.tab-btn[data-tab="tendencia"]').click();
+    await new Promise(r => setTimeout(r, 600));
+    const charts = {nacional: chartNac, cuenca: chartCuenca, empresa: chartEmpresa, frac: chartFrac};
+    const res = {}, mal = [];
+    for (const [k, c] of Object.entries(charts)) {
+      if (!c) { if (k === 'nacional' || k === 'frac') mal.push(k + ' sin crear'); continue; }
+      const t = Object.values(c.scales).map(s => s.options.ticks.font.size);
+      const otros = [c.options.plugins.legend.labels.font.size, c.options.plugins.tooltip.titleFont.size, c.options.plugins.tooltip.bodyFont.size];
+      res[k] = t.concat(otros).join('/');
+      if (t.concat(otros).some(f => !(f >= 14))) mal.push(k + ' ' + res[k]);
+    }
+    const css = ['#tab-tendencia .chart-label', '#tab-tendencia .section-title', '#tab-tendencia .cuenca-chip', '#tab-geo .geo-note']
+      .map(s => document.querySelector(s)).filter(Boolean).map(e => parseFloat(getComputedStyle(e).fontSize));
+    if (css.some(f => f < 14)) mal.push('textos del panel ' + css.join('/'));
+    document.querySelector('.tab-btn[data-tab="filtros"]').click();
+    return {ok: mal.length === 0, info: JSON.stringify(res) + ' · rótulos ' + css.join('/') + ' px', mal}; })()`);
+
+  // Viewport chico de escritorio (800 px): el mapa nunca queda por debajo de 280 px
+  await b.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 800, deviceScaleFactor: 1, mobile: false });
+  await check("viewport 800 px: mapa ≥ 280 px en todas las pestañas (Curvas incluida) y arrastrando el divisor al máximo", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    await espera(500);
+    const m = document.getElementById('map'), res = {};
+    for (const t of ['curvas', 'tendencia', 'ranking', 'geo', 'filtros']) {
+      document.querySelector('.tab-btn[data-tab="' + t + '"]').click(); await espera(400);
+      res[t] = m.offsetWidth;
+    }
+    const d = document.getElementById('sb-divisor'), r = d.getBoundingClientRect(), y = r.top + 200;
+    const ev = (t, cx) => d.dispatchEvent(new PointerEvent(t, {bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+      button: 0, buttons: t === 'pointerup' ? 0 : 1, clientX: cx, clientY: y, isPrimary: true}));
+    ev('pointerdown', r.left + 4); ev('pointermove', 5000); ev('pointerup', 5000); await espera(300);
+    res.arrastre = m.offsetWidth;
+    d.dispatchEvent(new MouseEvent('dblclick', {bubbles: true})); await espera(300);
+    return {ok: innerWidth === 800 && Object.values(res).every(w => w >= 280), info: JSON.stringify(res)}; })()`);
+  await b.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await sleep(500);
+
+  // Celular (400 px): sin scroll horizontal en ninguna pestaña, sin divisor ni "Ampliar"
+  await b.send("Emulation.setDeviceMetricsOverride", { width: 400, height: 800, deviceScaleFactor: 1, mobile: true });
+  await check("celular 400 px: sin scroll horizontal, sin divisor ni Ampliar", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    await espera(400);
+    const res = [];
+    for (const t of ['filtros', 'tendencia', 'ranking', 'geo', 'curvas']) {
+      document.querySelector('.tab-btn[data-tab="' + t + '"]').click(); await espera(500);
+      const p = document.getElementById('tab-' + t);
+      const de = document.documentElement;
+      const bm = document.getElementById('btn-movil'), rb = bm.getBoundingClientRect();
+      res.push({t, doc: de.scrollWidth - de.clientWidth, body: document.body.scrollWidth - innerWidth, pane: p.scrollWidth - p.clientWidth,
+        panel: document.getElementById('sidebar').offsetWidth, boton: rb.height >= 44 && rb.left >= 0 && rb.right <= innerWidth
+          && parseFloat(getComputedStyle(bm).fontSize) >= 14 && bm.textContent === 'Ver mapa'});
+    }
+    // Ranking en touch: empresa · cuenca hace wrap (sin "…") y la cifra sigue entera en su columna
+    document.querySelector('.tab-btn[data-tab="ranking"]').click(); await espera(400);
+    const remp = [...document.querySelectorAll('#ranking-list .remp')];
+    const cortadas = remp.filter(e => e.scrollWidth > e.clientWidth + 1).length;
+    const wrap = remp.length > 0 && getComputedStyle(remp[0]).whiteSpace === 'normal';
+    const valMal = [...document.querySelectorAll('#ranking-list .rank-val')].filter(v => v.scrollWidth > v.clientWidth
+      || v.getBoundingClientRect().right > v.closest('.rank-row').getBoundingClientRect().right + 0.5).length;
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(300);
+    const ocultos = document.getElementById('sb-divisor').offsetWidth === 0 && document.getElementById('btn-ampliar').offsetWidth === 0;
+    const mal = res.filter(x => x.doc > 0 || x.body > 0 || x.pane > 1 || x.panel !== 400 || !x.boton);
+    return {ok: mal.length === 0 && ocultos && innerWidth === 400 && wrap && cortadas === 0 && valMal === 0,
+      info: 'viewport ' + innerWidth + ' px · panel 400 px y botón "Ver mapa" en las 5 pestañas · ranking: ' + remp.length
+        + ' empresas con wrap, ' + cortadas + ' cortadas, ' + valMal + ' cifras mal', mal}; })()`);
+
+  await check("celular 400 px: 'Ver mapa' → mapa a pantalla completa (capas y leyenda enteras, botón sin tapar), 'Ver panel' vuelve; clic en el ranking muestra el mapa", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    const bm = document.getElementById('btn-movil'), m = document.getElementById('map'), sb = document.getElementById('sidebar');
+    const dentro = el => { if (!el) return true; const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5; };
+    const pisa = (a, b) => { if (!a || !b) return false; const p = a.getBoundingClientRect(), q = b.getBoundingClientRect();
+      return p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom; };
+    document.querySelector('.tab-btn[data-tab="filtros"]').click(); await espera(300);
+    bm.click(); await espera(500);
+    const leg = document.querySelector('.legend'), capas = document.querySelector('.leaflet-control-layers'),
+          atr = document.querySelector('.leaflet-control-attribution');
+    const a = {mapa: m.offsetWidth, leaflet: map.getSize().x, panel: sb.offsetWidth, txt: bm.textContent,
+      capas: dentro(capas), leyenda: dentro(leg), atribucion: dentro(atr), tapaLeyenda: pisa(bm, leg), tapaAtrib: pisa(bm, atr)};
+    bm.click(); await espera(400);
+    const v = {mapa: m.offsetWidth, panel: sb.offsetWidth, txt: bm.textContent};
+    document.querySelector('.tab-btn[data-tab="ranking"]').click();
+    for (let i = 0; i < 20 && !document.querySelector('#ranking-list .rank-row'); i++) await espera(250);
+    document.querySelector('#ranking-list .rank-row').click(); await espera(1800);
+    const r = {mapa: m.offsetWidth, panel: sb.offsetWidth, txt: bm.textContent, popup: !!document.querySelector('.leaflet-popup')};
+    map.closePopup();
+    const ok = a.mapa >= 398 && a.leaflet === a.mapa && a.panel === 0 && a.txt === 'Ver panel' && a.capas && a.leyenda && a.atribucion
+      && !a.tapaLeyenda && !a.tapaAtrib && v.panel === 400 && v.mapa === 0 && v.txt === 'Ver mapa'
+      && r.mapa >= 398 && r.panel === 0 && r.popup && r.txt === 'Ver panel';
+    return {ok, info: 'Ver mapa: ' + JSON.stringify(a) + ' · Ver panel: ' + JSON.stringify(v) + ' · ranking: ' + JSON.stringify(r)}; })()`);
+  await b.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await sleep(500);
+
+  await check("de celular (con el mapa a pantalla completa) a escritorio: layout coherente", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    await espera(400);
+    const sb = document.getElementById('sidebar'), m = document.getElementById('map');
+    const ok = !document.body.classList.contains('m-mapa') && !document.body.classList.contains('sb-full')
+      && sb.offsetWidth >= 460 && m.offsetWidth >= 280 && map.getSize().x === m.clientWidth
+      && document.getElementById('btn-movil').offsetWidth === 0 && document.getElementById('sb-divisor').offsetWidth > 0;
+    return {ok, info: 'panel ' + sb.offsetWidth + ' px · mapa ' + m.offsetWidth + ' px'}; })()`);
 
   await check("cambio de año (2025)", `(async () => {
     const s = document.getElementById('f-year'); s.value = '2025'; s.dispatchEvent(new Event('change'));

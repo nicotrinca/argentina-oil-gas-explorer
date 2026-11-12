@@ -140,7 +140,11 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
   Textos nuevos ≥ 14 px (tablas `.geo-table` 14 px, ticks SVG de barras 12 px).
 - Popups de pozo: `className: 'pozo-popup'`; su `.leaflet-popup-content` es SIEMPRE el contenedor de scroll
   (si no, el encabezado sticky `.lf-popup-head` se engancha a `.leaflet-container` y aparece a mitad del popup).
-- Pestaña Curvas ensancha la barra lateral (`body.sb-wide`); `#tabs` hace wrap a 2 filas con barra angosta.
+- Ancho del panel: `aplicarAnchoPanel()` fija `--sb-w` en `#sidebar` (Mapa ≈ 40 % 460–640 px; el resto, con
+  `body.sb-wide`, ≈ 60 % mín. 560 px; mapa nunca < 280 px). Divisor `#sb-divisor` arrastrable; ancho por pestaña
+  en `localStorage['pozos.anchoPanel']` (doble clic = default). "Ampliar" = `body.sb-full` (oculta el mapa; la
+  pestaña Mapa lo restaura). Tras cambiar el ancho, `relayoutPanel()` (invalidateSize + resize de Chart.js).
+  `#tabs` hace wrap a 2 filas solo con el panel < 440 px. En celular (≤ 760 px) no hay divisor ni Ampliar.
 - Capa "Zonas productivas VM": pane propio `zonas` (z 350, DEBAJO del canvas de puntos, `pointer-events:none`) y
   hexágonos `interactive:false`. El canvas de puntos cubre todo el mapa y se come los clics, así que el popup del
   hexágono sale de `map.on('click')` → `abrirZonaEn` (punto en polígono), salvo que el clic ya haya abierto otro popup
