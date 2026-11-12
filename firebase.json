@@ -2,7 +2,7 @@
   "hosting": {
     "public": "public",
     "predeploy": ["node tools/build_public.mjs"],
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/privado/**", "**/*.xlsx"],
     "headers": [
       {
         "source": "/index.html",

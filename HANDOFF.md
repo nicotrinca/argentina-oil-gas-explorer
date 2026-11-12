@@ -20,7 +20,7 @@ Publicado en **https://pozos-argentina.web.app** (Firebase Hosting, proyecto `po
   (contra la red puede fallar algún chequeo por tiempos; repetir antes de alarmarse).
 
 ## Cómo correrlo
-- `abrir.bat` (doble clic) levanta `python -m http.server 8765` y abre http://localhost:8765.
+- `abrir.bat` (doble clic) levanta `python -m http.server 8765 --bind 127.0.0.1` (solo esta PC) y abre http://localhost:8765.
 - Desde Claude Code: `preview_start {name: "pozos-petroleros"}` (puerto 8765).
 - **Nunca** con doble clic en `index.html` (`file://`): el navegador bloquea los `fetch` → sin capas,
   gráficos ni evolución del pozo (los pozos sí aparecen porque cargan por `<script>`). La página muestra
@@ -74,6 +74,18 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
    Solo hay coordenada de SUPERFICIE: todo es zonal (la rama de 2–3 km puede estar en otro hexágono).
    Cifra principal: ratio hijo/padre de acum. 12 meses/km dentro de cada hexágono con ≥ 3 padres y ≥ 3 hijos
    (2026-11: petróleo ≈ 1,02 en 55 hexágonos; gas ≈ 0,90 en 18).
+
+8. `preprocess_fichas.py "<ruta.xlsx>"` (o env `FICHAS_XLSX`; necesita `openpyxl` en el .venv) → `data/privado/fichas.json`.
+   **MODO PRIVADO, SOLO LOCAL**: fichas técnicas de yacimiento confidenciales (planilla local). En git solo va el parser
+   genérico; la descripción de la grilla está en `data/privado/plantilla_fichas.json` (local, formato en el docstring;
+   sin ese archivo el script no corre). Nunca a git ni a Firebase: `data/privado/` y `*.xlsx` en `.gitignore`, `**/privado/**`
+   en el `ignore` de `firebase.json`, y `build_public.mjs` falla (y borra `public/`) si ve una ruta "privado" o un texto
+   de las fichas en `public/` (`tools/privado.mjs`). No escribir valores de las fichas en código ni comentarios: la guarda
+   los detecta. El visor lo pide solo desde localhost (`modoPrivadoPermitido`); si no está, no muestra nada. Con el
+   archivo: insignia "Privado" en el encabezado, botón "Ficha de yacimiento" en el popup del pozo (`por_pozo`, por
+   idpozo que declaró ese `areayacimiento`) y en la capa Yacimientos (`por_yacimiento`, nombre normalizado), modal
+   `abrirFicha(id)` con la fecha de actualización destacada. No está en `tools/actualizar.py` (se corre a mano).
+   El servidor local escucha solo en 127.0.0.1 (`abrir.bat`, `.claude/launch.json`): data/privado no queda en la LAN.
 
 ## Actualización mensual
 - `tools/actualizar.py` (docstring = manual completo): consulta CKAN, baja lo que cambió (registro en

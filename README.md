@@ -112,7 +112,7 @@ To run the GeoPandas guide: `pip install jupyter matplotlib` and open
 ### 3. Serve
 
 ```bash
-python -m http.server 8765
+python -m http.server 8765 --bind 127.0.0.1
 ```
 
 Open <http://localhost:8765>. (A local server is needed because the page fetches JSON files.)

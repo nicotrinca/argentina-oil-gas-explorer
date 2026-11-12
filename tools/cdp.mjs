@@ -47,7 +47,8 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
   if (!target) { proc.kill(); throw new Error("Chrome headless no respondió"); }
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise(r => ws.onopen = r);
-  let id = 0; const pending = new Map(), logs = [], failed = [];
+  let id = 0; const pending = new Map(), logs = [], failed = [], urls = new Map();
+  const OPCIONAL = /\/data\/privado\//;
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
@@ -55,10 +56,12 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
       logs.push("EXCEPCIÓN: " + (m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text));
     if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error")
       logs.push("console.error: " + m.params.args.map(a => a.value ?? a.description).join(" "));
+    if (m.method === "Network.requestWillBeSent") urls.set(m.params.requestId, m.params.request.url);
+    // data/privado/ (modo privado, solo local) es opcional: si falta o se bloquea no es un error
     if (m.method === "Network.responseReceived" && m.params.response.status >= 400
-        && !m.params.response.url.endsWith("/favicon.ico"))
+        && !m.params.response.url.endsWith("/favicon.ico") && !OPCIONAL.test(m.params.response.url))
       failed.push(`${m.params.response.status} ${m.params.response.url}`);
-    if (m.method === "Network.loadingFailed" && !m.params.canceled)
+    if (m.method === "Network.loadingFailed" && !m.params.canceled && !OPCIONAL.test(urls.get(m.params.requestId) || ""))
       failed.push(`FALLÓ ${m.params.errorText} (requestId ${m.params.requestId})`);
   };
   const send = (method, params = {}) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });

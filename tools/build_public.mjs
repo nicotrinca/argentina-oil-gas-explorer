@@ -4,6 +4,7 @@
 import { rmSync, mkdirSync, copyFileSync, existsSync, statSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buscarFugas } from "./privado.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "public");
@@ -41,6 +42,10 @@ const anios = [...sel[1].matchAll(/value="(\d{4})"/g)].map(m => m[1]);
 if (!anios.length) { console.error("✘ El selector #f-year no tiene años"); process.exit(1); }
 const ARCHIVOS = [...FIJOS, ...anios.map(a => `data/pozos_${a}.js`)];
 
+// Modo privado: data/privado/ (fichas confidenciales) es SOLO LOCAL. Nunca entra en la whitelist.
+const privados = ARCHIVOS.filter(f => /privado|\.xlsx$/i.test(f));
+if (privados.length) { console.error("✘ La whitelist incluye archivos privados: " + privados.join(", ")); process.exit(1); }
+
 // Aviso si index.html menciona un data/... literal que no está en la lista (posible archivo nuevo sin sumar).
 const citados = new Set([...html.matchAll(/data\/[\w.-]+\.(?:json|geojson|js)/g)].map(m => m[0]));
 const fuera = [...citados].filter(f => !ARCHIVOS.includes(f));
@@ -62,6 +67,13 @@ for (const f of ARCHIVOS) {
   const n = statSync(join(OUT, f)).size;
   total += n;
   console.log(mb(n) + "  " + f);
+}
+// Guarda final: ninguna ruta con "privado" ni .xlsx en public/, ni textos de las fichas privadas en ningún archivo.
+const fugas = buscarFugas(OUT, ROOT);
+if (fugas.length) {
+  rmSync(OUT, { recursive: true, force: true });
+  console.error("✘ public/ tenía datos privados (se borró public/, no publicar):\n  " + fugas.join("\n  "));
+  process.exit(1);
 }
 console.log("─".repeat(40));
 console.log(mb(total) + "  total (" + ARCHIVOS.length + " archivos) en " + OUT);

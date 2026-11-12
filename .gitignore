@@ -9,6 +9,11 @@ capturas/
 
 # Downloaded and generated data (re-create with the preprocess scripts)
 data/
+# Modo privado (fichas de yacimiento confidenciales): SOLO LOCAL, nunca a git ni a Firebase.
+# data/ ya lo cubre; se repite explícito por si alguien des-ignora data/.
+data/privado/
+**/privado/
+*.xlsx
 outputs/
 
 # Heavy data anywhere in the tree

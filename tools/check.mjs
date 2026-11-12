@@ -1,6 +1,15 @@
 // Prueba de humo del visor en Chrome headless. Necesita el servidor en :8765 (abrir.bat o preview_start).
 // Uso: node tools/check.mjs        -> imprime ✔/✘ por chequeo y sale con código 1 si algo falla.
-import { launch, sleep } from "./cdp.mjs";
+import { launch, sleep, BASE } from "./cdp.mjs";
+import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { FICHAS, buscarFugas, listar } from "./privado.mjs";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(BASE);
+const HAY_FICHAS = LOCAL && existsSync(join(ROOT, FICHAS));
 
 const b = await launch();
 let ok = 0, bad = 0;
@@ -548,10 +557,105 @@ try {
     return {ok: document.querySelector('.t-year').textContent === '2025' && lastFiltered.length > 1000,
       info: lastFiltered.length + ' visibles'}; })()`);
 
+  // ── Modo privado (fichas de yacimiento, data/privado/fichas.json, SOLO LOCAL) ──
+  // Este archivo va a git: ni nombres ni valores de fichas en el código. Todo sale de fichas.json en tiempo de
+  // ejecución y la consola solo dice "ficha ok, N secciones" (los fallos devuelven booleanos y conteos).
+  if (HAY_FICHAS) {
+    await check("modo privado: insignia 'Privado' y ficha desde el popup de un pozo (idpozo) y desde la capa Yacimientos", `(async () => {
+      const espera = ms => new Promise(r => setTimeout(r, ms));
+      for (let i = 0; i < 40 && !fichasPriv; i++) await espera(250);
+      if (!fichasPriv) return {ok: false, info: 'fichas.json no cargó'};
+      const badge = document.querySelector('#sidebar header .privado-badge');
+      const badgeOk = !!badge && badge.textContent === 'Privado' && badge.title === 'Datos locales, no se publican'
+        && parseFloat(getComputedStyle(badge).fontSize) >= 14;
+      const enAnio = new Set(window.POZOS.map(r => r[I.id]));
+      const fi = fichasPriv.fichas.find(f => (f.pozos || []).some(id => enAnio.has(id)));
+      if (!fi) return {ok: false, info: 'ninguna ficha con pozos en el año'};
+      const r = window.POZOS.find(r => fi.pozos.includes(r[I.id]));
+      flyToPozo(r[I.id]);
+      const sel = '.leaflet-popup .ficha-pop button[onclick*="' + "'" + fi.id + "'" + '"]';
+      for (let i = 0; i < 20 && !document.querySelector(sel); i++) await espera(250);
+      const btn = document.querySelector(sel);
+      if (!btn) return {ok: false, info: 'el popup del pozo de prueba no tiene el botón de ficha'};
+      const btnOk = btn.textContent.includes(fi.titulo) && parseFloat(getComputedStyle(btn).fontSize) >= 14;
+      btn.click(); await espera(300);
+      const m = document.getElementById('ficha-modal');
+      const t = m ? m.textContent : '';
+      const fecha = m && m.querySelector('.fm-fecha');
+      const chicos = m ? [...m.querySelectorAll('*')].filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())
+        && parseFloat(getComputedStyle(e).fontSize) < 14).length : -1;
+      const det = m ? m.querySelectorAll('details').length : 0;
+      const fAct = fi.fecha_act || fi.ultimo_dato;
+      const unValor = fi.secciones.flatMap(s => s.filas).find(x => /[a-z]/i.test(x.v));
+      const modalOk = !!m && !!fecha && !!fAct && fecha.textContent.includes(fAct) && parseFloat(getComputedStyle(fecha).fontSize) >= 16
+        && !!unValor && t.includes(unValor.v) && det === fi.secciones.length + (fi.tablas || []).length && det >= 1
+        && chicos === 0 && !/NaN|undefined|null/.test(t);
+      document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+      await espera(100);
+      const cierra = !document.getElementById('ficha-modal');
+      map.closePopup();
+      const conPol = fichasPriv.fichas.find(f => f.poligono);
+      const yacOk = !conPol || fichaYacHTML(conPol.poligono).includes("abrirFicha('" + conPol.id + "')");
+      const conFicha = new Set(Object.keys(fichasPriv.por_yacimiento));
+      const otroYac = (pozosGeo ? pozosGeo.tablas.yacimiento : []).find(n => n && !conFicha.has(normYac(n)));
+      const sinYacOk = !!otroYac && fichaYacHTML(otroYac) === '';
+      const sinFicha = window.POZOS.find(x => !fichasPriv.por_pozo[x[I.id]]);
+      const limpio = !/ficha-pop/.test(pozoPopupHTML(sinFicha));
+      return {ok: badgeOk && btnOk && modalOk && cierra && yacOk && sinYacOk && limpio,
+        info: 'ficha ok, ' + det + ' secciones', badgeOk, btnOk, modalOk, cierra, yacOk, sinYacOk, limpio, chicos}; })()`);
+  } else {
+    ok++; console.log("✔ modo privado (con archivo) · se omite: " + (LOCAL ? "no existe " + FICHAS : "sitio no local"));
+  }
+
+  await check("modo privado: online no se pide (solo localhost)", `({ok: modoPrivadoPermitido('localhost') && modoPrivadoPermitido('127.0.0.1')
+    && !modoPrivadoPermitido('pozos-argentina.web.app') && !modoPrivadoPermitido('pozos-argentina.firebaseapp.com'),
+    info: 'hostname actual ' + location.hostname})`);
+
+  // Sin el archivo (pedido bloqueado, como si faltara): no aparece nada y no hay errores.
+  // Pozos y polígono de prueba: los de una ficha si hay fichas.json local (leídos acá, no escritos en el código).
+  const prueba = { pozos: [], poligono: null };
+  if (HAY_FICHAS) {
+    const fx = JSON.parse(readFileSync(join(ROOT, FICHAS), "utf8"));
+    prueba.pozos = fx.fichas.flatMap(f => f.pozos || []);
+    prueba.poligono = (fx.fichas.find(f => f.poligono) || {}).poligono || null;
+  }
+  await b.send("Network.setBlockedURLs", { urls: ["*data/privado/*"] });
+  await b.open();
+  await check("modo privado: sin data/privado/fichas.json no aparece nada (ni insignia, ni ficha en popups, ni errores)", `(async () => {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    const P = ${JSON.stringify(prueba)};
+    await espera(1500);
+    const ids = new Set(P.pozos);
+    const r = window.POZOS.find(r => ids.has(r[I.id])) || window.POZOS[0];
+    const popup = pozoPopupHTML(r);
+    const pol = P.poligono || (pozosGeo ? pozosGeo.tablas.yacimiento[0] : 'X');
+    const nada = fichasPriv === null && !document.querySelector('.privado-badge') && !document.getElementById('ficha-modal')
+      && !/ficha-pop|Ficha de yacimiento/.test(popup) && fichaYacHTML(pol) === ''
+      && !/Privado/.test(document.getElementById('sidebar').textContent);
+    return {ok: nada, info: 'pozo ' + (ids.has(r[I.id]) ? 'con ficha local' : 'cualquiera') + ' sin botón; fichasPriv = ' + fichasPriv}; })()`);
+  await b.send("Network.setBlockedURLs", { urls: [] });
+
   await sleep(500);
 } catch (e) {
   bad++; console.log("✘ carga de la página · " + e.message);
 } finally {
+  // public/ (lo que se sube a Firebase) sin nada privado: se arma con build_public.mjs y se revisa
+  if (LOCAL) {
+    try {
+      execFileSync(process.execPath, [join(ROOT, "tools/build_public.mjs")], { stdio: "pipe" });
+      const pub = join(ROOT, "public");
+      const fugas = buscarFugas(pub, ROOT);
+      const datos = listar(pub).filter(f => f.startsWith("data/") && readFileSync(join(pub, f), "utf8").includes("privado"));
+      const html = readFileSync(join(pub, "index.html"), "utf8");
+      const menciones = (html.match(/data\/privado\/[\w.-]+/g) || []);
+      const okPub = !fugas.length && !datos.length && menciones.every(x => x === FICHAS);
+      if (okPub) { ok++; console.log(`✔ public/ sin datos privados · ${listar(pub).length} archivos, ninguna ruta "privado", ningún dato con "privado", `
+        + `0 valores de fichas${HAY_FICHAS ? "" : " (sin fichas locales para comparar)"}; index.html solo nombra ${FICHAS} (fetch local)`); }
+      else { bad++; console.log("✘ public/ con datos privados · " + JSON.stringify({ fugas, datos, menciones })); }
+    } catch (e) {
+      bad++; console.log("✘ public/ sin datos privados · build_public.mjs falló: " + String(e.stderr || e.message).split("\n").slice(0, 4).join(" | "));
+    }
+  }
   if (b.failed.length) { bad++; console.log("✘ pedidos fallidos:\n  " + b.failed.join("\n  ")); }
   if (b.logs.length) { bad++; console.log("✘ errores de consola:\n  " + b.logs.join("\n  ")); }
   console.log(`\n${ok} bien, ${bad} mal`);

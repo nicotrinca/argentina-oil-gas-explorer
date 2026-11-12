@@ -410,6 +410,43 @@
   #loading p { margin-top: 16px; font-size: 15px; }
   .spinner { width: 44px; height: 44px; border: 4px solid #2a3a5a; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* ── Modo privado (fichas de yacimiento, data/privado/, SOLO LOCAL): todo se crea por JS si el archivo existe ── */
+  .privado-badge { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 10px; vertical-align: middle;
+    font-size: 14px; font-weight: 700; color: #ffe08a; background: #4a3a10; border: 1px solid #a07a1c; cursor: help; }
+  .ficha-pop { margin: 4px 0 8px; padding: 8px; border: 1px solid #e0c46c; border-radius: 6px; background: #fff8e1; }
+  .ficha-pop .spark-label { color: #6d5410; font-weight: 600; }
+  .ficha-pop button { display: block; width: 100%; margin-top: 4px; padding: 7px 8px; font-size: 14px; font-weight: 600;
+    text-align: left; color: #3d2f05; background: #ffe9a8; border: 1px solid #d6b048; border-radius: 5px; cursor: pointer; }
+  .ficha-pop button:hover { background: #ffdf80; }
+  #ficha-modal { position: fixed; inset: 0; z-index: 3000; background: #000a; display: flex; align-items: flex-start;
+    justify-content: center; padding: 24px 12px; overflow-y: auto; }
+  #ficha-modal .fm-box { width: min(820px, 100%); background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 10px 40px #000c; font-size: 15px; }
+  #ficha-modal .fm-head { position: sticky; top: -24px; z-index: 2; display: flex; gap: 12px; align-items: flex-start;
+    justify-content: space-between; padding: 14px 18px 10px; background: var(--panel-2); border-bottom: 1px solid var(--border);
+    border-radius: 10px 10px 0 0; }
+  #ficha-modal h2 { font-size: 20px; color: #fff; }
+  #ficha-modal .fm-sub { font-size: 14px; color: var(--text-dim); margin-top: 2px; }
+  #ficha-modal .fm-x { flex: none; font-size: 18px; padding: 4px 12px; color: var(--text); background: var(--panel-3);
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+  #ficha-modal .fm-fecha { margin: 14px 18px 0; padding: 10px 14px; border-radius: 8px; background: #4a3a10; border: 1px solid #c79a2a;
+    color: #ffe08a; font-size: 16px; font-weight: 700; }
+  #ficha-modal .fm-fecha span { display: block; font-size: 14px; font-weight: 400; color: #f3dfa6; margin-top: 2px; }
+  #ficha-modal .fm-body { padding: 10px 18px 18px; }
+  #ficha-modal .fm-nota { font-size: 14px; color: var(--text-mute); margin: 8px 0 4px; }
+  #ficha-modal .fm-grid { display: grid; grid-template-columns: minmax(180px, auto) 1fr; gap: 4px 16px; font-size: 15px; }
+  #ficha-modal .fm-grid .k { color: var(--text-dim); }
+  #ficha-modal .fm-grid .v { color: #fff; font-weight: 600; }
+  #ficha-modal .fm-grid .u { color: var(--text-mute); font-weight: 400; }
+  #ficha-modal .fm-grid .g { grid-column: 1 / -1; margin-top: 8px; color: var(--accent); font-weight: 700; font-size: 14px; }
+  #ficha-modal details { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
+  #ficha-modal summary { padding: 9px 12px; font-size: 16px; font-weight: 700; cursor: pointer; color: #fff; }
+  #ficha-modal details > div { padding: 2px 12px 12px; }
+  #ficha-modal .fm-tabla { overflow-x: auto; }
+  #ficha-modal table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
+  #ficha-modal th, #ficha-modal td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+  #ficha-modal th { color: var(--text-dim); font-weight: 600; }
+  #ficha-modal td:first-child, #ficha-modal th:first-child { text-align: left; }
 </style>
 </head>
 <body>
@@ -422,7 +459,7 @@ if (location.protocol === 'file:') document.addEventListener('DOMContentLoaded',
     'padding:10px 16px;font:15px/1.4 system-ui,sans-serif;text-align:center';
   d.innerHTML = '⚠ Abriste el archivo directo, así el navegador bloquea las capas (cuencas, yacimientos, áreas), ' +
     'los gráficos y la evolución de cada pozo. Cerrá esta pestaña y abrí con <b>abrir.bat</b> ' +
-    '(o <code>python -m http.server 8765</code> y entrá a <b>http://localhost:8765</b>).';
+    '(o <code>python -m http.server 8765 --bind 127.0.0.1</code> y entrá a <b>http://localhost:8765</b>).';
   document.body.appendChild(d);
 });
 </script>
@@ -793,8 +830,8 @@ const refiLayer = lazyGeo('data/refinerias.geojson', {
 });
 const yacLayer = lazyGeo('data/yacimientos.geojson', {
   style: { color: '#9ccc65', weight: 1, fillColor: '#9ccc65', fillOpacity: 0.07 },
-  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(
-    `<div class="lf-popup-empresa">Yacimiento ${p.nombre}</div>` + popupGrid([['Operador', p.operador]])); },
+  onEachFeature: (f, lyr) => { const p = f.properties; lyr.bindPopup(() =>
+    `<div class="lf-popup-empresa">Yacimiento ${p.nombre}</div>` + popupGrid([['Operador', p.operador]]) + fichaYacHTML(p.nombre)); },
 });
 const permLayer = lazyGeo('data/permisos.geojson', {
   style: { color: '#ff8a65', weight: 1.5, dashArray: '6 4', fillColor: '#ff8a65', fillOpacity: 0.08 },
@@ -1260,7 +1297,7 @@ function pozoPopupHTML(r) {
       <span class="k">Corte agua</span><span class="v">${(r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1)+'%' : '—'}</span>
       <span class="k">Meses activo</span><span class="v">${r[I.ma]}</span>
       <span class="k">Tipo</span>       <span class="v">${r[I.tr] || '—'}</span>
-    </div>${geoPopupHTML(id, r[I.cu])}${fracPopupHTML(id)}${sparkHtml}${declPlaceholder(r)}`;
+    </div>${geoPopupHTML(id, r[I.cu])}${fichaPopupHTML(id)}${fracPopupHTML(id)}${sparkHtml}${declPlaceholder(r)}`;
 }
 function openPopup(marker, r) {
   marker.bindPopup(pozoPopupHTML(r), { maxWidth: 290, className: 'pozo-popup' }).openPopup();
@@ -2596,12 +2633,125 @@ function escAttr(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ── Modo privado: fichas de yacimiento confidenciales (preprocess_fichas.py → data/privado/fichas.json) ──
+// SOLO LOCAL: el archivo está en .gitignore y fuera de la whitelist de build_public.mjs (que además falla si
+// aparece algo privado en public/). Solo se pide desde localhost; online no se pide nada y no se muestra nada.
+// Si falta el archivo (404) tampoco se muestra nada. Pozos por idpozo (por_pozo), capa Yacimientos por nombre.
+let fichasPriv = null;
+const modoPrivadoPermitido = host => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(host);
+const normYac = s => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toUpperCase()
+  .replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+function cargarFichasPrivadas() {
+  if (!modoPrivadoPermitido(location.hostname)) return Promise.resolve(null);
+  return fetch('data/privado/fichas.json', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !Array.isArray(d.fichas) || !d.fichas.length) return null;
+      d.porId = Object.fromEntries(d.fichas.map(f => [f.id, f]));
+      fichasPriv = d;
+      const h1 = document.querySelector('#sidebar header h1');
+      if (h1 && !document.querySelector('.privado-badge')) {
+        const b = document.createElement('span');
+        b.className = 'privado-badge';
+        b.textContent = 'Privado';
+        b.title = 'Datos locales, no se publican';
+        h1.appendChild(b);
+      }
+      return d;
+    })
+    .catch(() => null);
+}
+
+// Años desde la fecha de la ficha ("dd/mm/aaaa" o "aaaa") hasta hoy
+function fichaAntiguedad(f) {
+  const t = f.fecha_act || f.ultimo_dato || '';
+  const m = t.match(/(\d{4})$/);
+  return m ? new Date().getFullYear() - +m[1] : null;
+}
+function fichaCuandoCorta(f) {
+  return f.fecha_act ? 'actualizada ' + f.fecha_act : (f.ultimo_dato ? 'sin fecha · dato más reciente ' + f.ultimo_dato : 'sin fecha');
+}
+function fichaBotones(ids) {
+  return ids.map(i => fichasPriv.porId[i]).filter(Boolean).map(f =>
+    `<button type="button" onclick="abrirFicha('${escAttr(f.id)}')">Ficha de yacimiento: ${escAttr(f.titulo)} · ${escAttr(fichaCuandoCorta(f))}</button>`).join('');
+}
+function fichaPopupHTML(id) {
+  const ids = fichasPriv && fichasPriv.por_pozo[id];
+  if (!ids || !ids.length) return '';
+  return `<div class="ficha-pop"><div class="spark-label" title="Datos locales, no se publican">Privado · ficha técnica del yacimiento</div>${fichaBotones(ids)}</div>`;
+}
+function fichaYacHTML(nombre) {
+  const ids = fichasPriv && fichasPriv.por_yacimiento[normYac(nombre)];
+  if (!ids || !ids.length) return '';
+  return `<div class="ficha-pop"><div class="spark-label" title="Datos locales, no se publican">Privado · ficha técnica</div>${fichaBotones(ids)}</div>`;
+}
+
+// Rango de años con datos, el mismo del selector #f-year (preprocess_fichas.py lee todos esos CSV)
+function rangoAniosDatos() {
+  const a = [...document.querySelectorAll('#f-year option')].map(o => +o.value).filter(Boolean);
+  if (!a.length) return 'los años disponibles';
+  const lo = Math.min(...a), hi = Math.max(...a);
+  return lo === hi ? String(lo) : lo + '–' + hi;
+}
+
+function cerrarFicha() {
+  const m = document.getElementById('ficha-modal');
+  if (m) m.remove();
+  document.removeEventListener('keydown', fichaEsc);
+}
+function fichaEsc(e) { if (e.key === 'Escape') cerrarFicha(); }
+
+function abrirFicha(fid) {
+  const f = fichasPriv && fichasPriv.porId[fid];
+  if (!f) return;
+  cerrarFicha();
+  const esc = escAttr;
+  const grid = filas => {
+    let g = null;
+    return `<div class="fm-grid">` + filas.map(x => {
+      const cab = x.g && x.g !== g ? `<div class="g">${esc(x.g)}</div>` : '';
+      g = x.g || g;
+      return cab + `<span class="k">${esc(x.e)}</span><span class="v">${esc(x.v)}${x.u ? ` <span class="u">${esc(x.u)}</span>` : ''}</span>`;
+    }).join('') + `</div>`;
+  };
+  const algunaAbierta = f.secciones.some(s => s.abierta);
+  const secs = f.secciones.map((s, i) => `<details${s.abierta || (!algunaAbierta && i === 0) ? ' open' : ''} data-sec="${esc(s.id)}">
+      <summary>${esc(s.titulo)}</summary><div>${grid(s.filas)}</div></details>`).join('');
+  const tablas = (f.tablas || []).map(t => `<details data-sec="${esc(t.id)}"><summary>${esc(t.titulo)}</summary><div class="fm-tabla">
+      <table><thead><tr>${t.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${t.filas.map(r => `<tr>${r.map(v => `<td>${v == null ? '' : esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`).join('');
+  const anios = fichaAntiguedad(f);
+  const fecha = f.fecha_act
+    ? `Ficha actualizada al ${esc(f.fecha_act)}${anios != null ? ` · hace ${anios} años` : ''}`
+    : `Ficha sin fecha de actualización${f.ultimo_dato ? ` · dato más reciente: ${esc(f.ultimo_dato)}` : ''}${anios != null ? ` (hace ${anios} años)` : ''}`;
+  const n = (f.pozos || []).length;
+  const m = document.createElement('div');
+  m.id = 'ficha-modal';
+  m.innerHTML = `<div class="fm-box" role="dialog" aria-modal="true" aria-labelledby="fm-titulo">
+    <div class="fm-head"><div><h2 id="fm-titulo">Ficha de yacimiento · ${esc(f.titulo)}</h2>
+      <div class="fm-sub">Yacimiento en el visor: ${esc(f.yacimiento || 'sin match')}${n ? ` · ${fmtNum(n)} pozos (idpozo) lo declaran en ${rangoAniosDatos()}` : ''}</div></div>
+      <button type="button" class="fm-x" title="Cerrar (Esc)" onclick="cerrarFicha()">✕</button></div>
+    <div class="fm-fecha">${fecha}<span>Datos históricos de la ficha original: no describen el estado actual del yacimiento.</span></div>
+    <div class="fm-body">
+      ${grid(f.cabecera || [])}
+      <p class="fm-nota"><span class="privado-badge" style="margin-left:0" title="Datos locales, no se publican">Privado</span>
+        Datos locales y confidenciales, no se publican. Valores y unidades transcriptos tal cual de la ficha original.</p>
+      ${secs}${tablas}
+    </div></div>`;
+  m.addEventListener('click', e => { if (e.target === m) cerrarFicha(); });
+  document.body.appendChild(m);
+  document.addEventListener('keydown', fichaEsc);
+  m.querySelector('.fm-x').focus();
+}
+
 // ── Init (al final, cuando ya están definidas todas las funciones y vars) ───
 aplicarAnchoPanel();
 populateFilters();
 loadCuencasPanel();
 applyFilters();
 document.getElementById('loading').style.display = 'none';
+cargarFichasPrivadas();
 </script>
 </body>
 </html>

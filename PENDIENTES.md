@@ -21,6 +21,9 @@
    Celular: panel a pantalla completa + botón flotante "Ver mapa"/"Ver panel". Detalles: encabezado alto en celular
    (~350 px antes del contenido); control de animación y leyenda pueden superponerse a 400 px.
    Quedan < 14 px: `.qa-row`, `.sr-sub`, `.sr-empty`, `.range-row`, `#anim-hint`, `#btn-noconv`, leyenda del mapa, popup.
+8. ~~**Modo privado local (fichas de yacimiento)**~~ — HECHO 2026-11-12: `preprocess_fichas.py <xlsx>` →
+   `data/privado/` (nunca se commitea ni publica). Posible siguiente: cruzar fechas de spud/profundidades de la base
+   comercial de pozos de 2019 en el mismo modo privado.
 4. **Pozos que entran y salen de producción**: conexiones nuevas, cierres y reactivaciones por mes, operador y área.
 5. **Ficha por área de concesión**: serie temporal, mezcla petróleo/gas, top pozos, GOR y corte de agua en el tiempo.
    Incluye arreglar las concesiones superpuestas (LOMA LA LATA - SIERRA BARROSA / LA ANGOSTURA SUR I, mismos 57 pozos).
