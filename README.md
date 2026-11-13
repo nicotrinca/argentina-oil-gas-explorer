@@ -106,6 +106,12 @@ python preprocess_curvas.py     # curvas.json, curvas_pozos.json (type curves, E
 python preprocess_zonas.py      # zonas.json, interferencia.json (needs curvas)
 ```
 
+Optional, **local-only private mode** (never committed nor deployed): `preprocess_fichas.py` (field data sheets
+from a local spreadsheet) and `preprocess_base_comercial.py "<path.shp>" [config]` (or env `BASE_COMERCIAL_SHP`; a licensed
+commercial well database described by a local config file, matched to the viewer's wells by name and, failing that, by distance) write to
+`data/privado/`, which is git-ignored and excluded from `public/`. The viewer only requests those files from
+localhost; without them nothing private is shown.
+
 To run the GeoPandas guide: `pip install jupyter matplotlib` and open
 `docs/geopandas_guide.ipynb`.
 

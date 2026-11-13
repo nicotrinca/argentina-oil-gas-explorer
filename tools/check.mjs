@@ -5,11 +5,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FICHAS, buscarFugas, listar } from "./privado.mjs";
+import { FICHAS, BASE_COM, buscarFugas, listar } from "./privado.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(BASE);
 const HAY_FICHAS = LOCAL && existsSync(join(ROOT, FICHAS));
+const HAY_BASE = LOCAL && existsSync(join(ROOT, BASE_COM));
 
 const b = await launch();
 let ok = 0, bad = 0;
@@ -588,7 +589,7 @@ try {
       const fAct = fi.fecha_act || fi.ultimo_dato;
       const unValor = fi.secciones.flatMap(s => s.filas).find(x => /[a-z]/i.test(x.v));
       const modalOk = !!m && !!fecha && !!fAct && fecha.textContent.includes(fAct) && parseFloat(getComputedStyle(fecha).fontSize) >= 16
-        && !!unValor && t.includes(unValor.v) && det === fi.secciones.length + (fi.tablas || []).length && det >= 1
+        && !!unValor && t.includes(unValor.v) && det === fi.secciones.length + (fi.tablas || []).length + (m.querySelector('details[data-sec="base-comercial"]') ? 1 : 0) && det >= 1
         && chicos === 0 && !/NaN|undefined|null/.test(t);
       document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
       await espera(100);
@@ -600,11 +601,63 @@ try {
       const otroYac = (pozosGeo ? pozosGeo.tablas.yacimiento : []).find(n => n && !conFicha.has(normYac(n)));
       const sinYacOk = !!otroYac && fichaYacHTML(otroYac) === '';
       const sinFicha = window.POZOS.find(x => !fichasPriv.por_pozo[x[I.id]]);
-      const limpio = !/ficha-pop/.test(pozoPopupHTML(sinFicha));
+      const limpio = !/class="ficha-pop"/.test(pozoPopupHTML(sinFicha));
       return {ok: badgeOk && btnOk && modalOk && cierra && yacOk && sinYacOk && limpio,
         info: 'ficha ok, ' + det + ' secciones', badgeOk, btnOk, modalOk, cierra, yacOk, sinYacOk, limpio, chicos}; })()`);
   } else {
     ok++; console.log("✔ modo privado (con archivo) · se omite: " + (LOCAL ? "no existe " + FICHAS : "sitio no local"));
+  }
+
+  // ── Modo privado: base comercial licenciada (data/privado/base_comercial.json, SOLO LOCAL) ──
+  // Va a git: ni nombres ni valores de la base en el código. El pozo de prueba sale del json en tiempo de ejecución
+  // y la consola solo dice "base comercial ok" (los fallos devuelven booleanos y conteos).
+  if (HAY_BASE) {
+    await check("modo privado: base comercial en el popup (línea Spud/TD) y modal con todos los campos, método y distancia", `(async () => {
+      const espera = ms => new Promise(r => setTimeout(r, ms));
+      for (let i = 0; i < 60 && !baseCom; i++) await espera(250);
+      if (!baseCom) return {ok: false, info: 'base_comercial.json no cargó'};
+      const badgeOk = !!document.querySelector('#sidebar header .privado-badge');
+      const conDato = window.POZOS.filter(r => { const o = baseComPozo(r[I.id]); return o && o.spud && o.td && o.metodo === 'nombre'; });
+      if (!conDato.length) return {ok: false, info: 'ningún pozo del año con spud y TD en la base'};
+      const r = conDato[Math.floor(conDato.length / 2)];
+      const o = baseComPozo(r[I.id]);
+      flyToPozo(r[I.id]);
+      const sel = '.leaflet-popup .bc-pop button';
+      const propio = () => [...document.querySelectorAll(sel)].find(x => x.getAttribute('onclick') === 'abrirBaseCom(' + r[I.id] + ')');
+      for (let i = 0; i < 40 && !propio(); i++) await espera(250);
+      const btn = propio();
+      if (!btn) return {ok: false, info: 'el popup del pozo de prueba no tiene la línea de la base comercial'};
+      const lbl = btn.parentElement.querySelector('.spark-label');
+      const btnOk = /^Spud .+ · TD [\\d.]+ m$/.test(btn.textContent) && btn.textContent === baseComResumen(o)
+        && parseFloat(getComputedStyle(btn).fontSize) >= 14 && !!lbl && /Privado · base comercial \\(\\d{4}\\)/.test(lbl.textContent)
+        && parseFloat(getComputedStyle(lbl).fontSize) >= 14;
+      btn.click(); await espera(300);
+      const m = document.getElementById('ficha-modal');
+      const t = m ? m.textContent : '';
+      const sec = m && m.querySelector('[data-sec="base-comercial"]');
+      const sinRepetir = !!m && !m.querySelector('summary') && !/proximidad/i.test(m.querySelector('.fm-sub').textContent) && /^Cruce por nombre · /.test(m.querySelector('.fm-sub').textContent);
+      const chicos = m ? [...m.querySelectorAll('*')].filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())
+        && parseFloat(getComputedStyle(e).fontSize) < 14).length : -1;
+      const filas = baseComFilas(o);
+      const modalOk = !!sec && sinRepetir && filas.length >= 8 && filas.every(x => t.includes(x.v)) && t.includes(BC_METODO.nombre)
+        && t.includes(bcMetros(o.dist)) && /Distancia entre coordenadas/.test(t) && chicos === 0 && !/NaN|undefined|null/.test(t);
+      document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+      await espera(100);
+      const cierra = !document.getElementById('ficha-modal');
+      map.closePopup();
+      let fichaOk = true;
+      const conAmbas = fichasPriv && window.POZOS.find(x => fichasPriv.por_pozo[x[I.id]] && baseComPozo(x[I.id]));
+      if (conAmbas) {
+        abrirFicha(fichasPriv.por_pozo[conAmbas[I.id]][0], conAmbas[I.id]); await espera(200);
+        fichaOk = !!document.querySelector('#ficha-modal details[data-sec="base-comercial"][open]') && !!document.querySelector('#ficha-modal .fm-chip[href="#fm-base-comercial"]');
+        cerrarFicha();
+      }
+      const sinDato = window.POZOS.find(x => !baseCom.pozos[x[I.id]]);
+      const limpio = !!sinDato && !/bc-pop/.test(pozoPopupHTML(sinDato));
+      return {ok: badgeOk && btnOk && modalOk && cierra && fichaOk && limpio,
+        info: 'base comercial ok', faltan: btnOk && modalOk ? 0 : baseComFilas(o).filter(x => !t.includes(x.v)).length, badgeOk, btnOk, modalOk, cierra, fichaOk, limpio, chicos}; })()`);
+  } else {
+    ok++; console.log("✔ modo privado: base comercial · se omite: " + (LOCAL ? "no existe " + BASE_COM : "sitio no local"));
   }
 
   await check("modo privado: online no se pide (solo localhost)", `({ok: modoPrivadoPermitido('localhost') && modoPrivadoPermitido('127.0.0.1')
@@ -619,9 +672,13 @@ try {
     prueba.pozos = fx.fichas.flatMap(f => f.pozos || []);
     prueba.poligono = (fx.fichas.find(f => f.poligono) || {}).poligono || null;
   }
+  if (HAY_BASE) {
+    const bx = JSON.parse(readFileSync(join(ROOT, BASE_COM), "utf8"));
+    prueba.pozos.push(...Object.keys(bx.pozos).map(Number));
+  }
   await b.send("Network.setBlockedURLs", { urls: ["*data/privado/*"] });
   await b.open();
-  await check("modo privado: sin data/privado/fichas.json no aparece nada (ni insignia, ni ficha en popups, ni errores)", `(async () => {
+  await check("modo privado: sin data/privado/ no aparece nada (ni insignia, ni ficha ni base comercial en popups, ni errores)", `(async () => {
     const espera = ms => new Promise(r => setTimeout(r, ms));
     const P = ${JSON.stringify(prueba)};
     await espera(1500);
@@ -629,10 +686,10 @@ try {
     const r = window.POZOS.find(r => ids.has(r[I.id])) || window.POZOS[0];
     const popup = pozoPopupHTML(r);
     const pol = P.poligono || (pozosGeo ? pozosGeo.tablas.yacimiento[0] : 'X');
-    const nada = fichasPriv === null && !document.querySelector('.privado-badge') && !document.getElementById('ficha-modal')
-      && !/ficha-pop|Ficha de yacimiento/.test(popup) && fichaYacHTML(pol) === ''
+    const nada = fichasPriv === null && baseCom === null && !document.querySelector('.privado-badge') && !document.getElementById('ficha-modal')
+      && !/ficha-pop|Ficha de yacimiento|bc-pop|Base comercial/.test(popup) && fichaYacHTML(pol) === '' && baseComPopupHTML(r[I.id]) === ''
       && !/Privado/.test(document.getElementById('sidebar').textContent);
-    return {ok: nada, info: 'pozo ' + (ids.has(r[I.id]) ? 'con ficha local' : 'cualquiera') + ' sin botón; fichasPriv = ' + fichasPriv}; })()`);
+    return {ok: nada, info: 'pozo ' + (ids.has(r[I.id]) ? 'con dato privado local' : 'cualquiera') + ' sin botón; fichasPriv = ' + fichasPriv + ', baseCom = ' + baseCom}; })()`);
   await b.send("Network.setBlockedURLs", { urls: [] });
 
   await sleep(500);
@@ -648,9 +705,10 @@ try {
       const datos = listar(pub).filter(f => f.startsWith("data/") && readFileSync(join(pub, f), "utf8").includes("privado"));
       const html = readFileSync(join(pub, "index.html"), "utf8");
       const menciones = (html.match(/data\/privado\/[\w.-]+/g) || []);
-      const okPub = !fugas.length && !datos.length && menciones.every(x => x === FICHAS);
+      const okPub = !fugas.length && !datos.length && menciones.every(x => x === FICHAS || x === BASE_COM);
       if (okPub) { ok++; console.log(`✔ public/ sin datos privados · ${listar(pub).length} archivos, ninguna ruta "privado", ningún dato con "privado", `
-        + `0 valores de fichas${HAY_FICHAS ? "" : " (sin fichas locales para comparar)"}; index.html solo nombra ${FICHAS} (fetch local)`); }
+        + `0 valores de fichas${HAY_FICHAS ? "" : " (sin fichas locales para comparar)"} y de la base comercial`
+        + `${HAY_BASE ? "" : " (sin base local para comparar)"}; index.html solo nombra ${FICHAS} y ${BASE_COM} (fetch local)`); }
       else { bad++; console.log("✘ public/ con datos privados · " + JSON.stringify({ fugas, datos, menciones })); }
     } catch (e) {
       bad++; console.log("✘ public/ sin datos privados · build_public.mjs falló: " + String(e.stderr || e.message).split("\n").slice(0, 4).join(" | "));

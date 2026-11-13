@@ -447,6 +447,15 @@
   #ficha-modal th, #ficha-modal td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
   #ficha-modal th { color: var(--text-dim); font-weight: 600; }
   #ficha-modal td:first-child, #ficha-modal th:first-child { text-align: left; }
+  #ficha-modal .fm-chip { display: inline-block; margin: 6px 0 2px; padding: 4px 12px; border-radius: 14px; font-size: 14px;
+    font-weight: 700; color: #ffe08a; background: #4a3a10; border: 1px solid #a07a1c; text-decoration: none; }
+  #ficha-modal .fm-chip:hover { background: #5c4814; }
+  #ficha-modal #fm-base-comercial { scroll-margin-top: 96px; }
+  @media (max-width: 760px) {
+    #ficha-modal .fm-grid { grid-template-columns: 1fr; gap: 0; }
+    #ficha-modal .fm-grid .k { margin-top: 8px; }
+    #ficha-modal .fm-grid .g { margin-top: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -1297,7 +1306,7 @@ function pozoPopupHTML(r) {
       <span class="k">Corte agua</span><span class="v">${(r[I.pet]+r[I.agua]) > 0 ? wcutVal(r).toFixed(1)+'%' : '—'}</span>
       <span class="k">Meses activo</span><span class="v">${r[I.ma]}</span>
       <span class="k">Tipo</span>       <span class="v">${r[I.tr] || '—'}</span>
-    </div>${geoPopupHTML(id, r[I.cu])}${fichaPopupHTML(id)}${fracPopupHTML(id)}${sparkHtml}${declPlaceholder(r)}`;
+    </div>${geoPopupHTML(id, r[I.cu])}${fichaPopupHTML(id)}${baseComPopupHTML(id)}${fracPopupHTML(id)}${sparkHtml}${declPlaceholder(r)}`;
 }
 function openPopup(marker, r) {
   marker.bindPopup(pozoPopupHTML(r), { maxWidth: 290, className: 'pozo-popup' }).openPopup();
@@ -2642,6 +2651,17 @@ const modoPrivadoPermitido = host => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(h
 const normYac = s => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toUpperCase()
   .replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+// Insignia "Privado" en el encabezado (una sola, la pone el primer archivo privado que cargue)
+function ponerInsigniaPrivado() {
+  const h1 = document.querySelector('#sidebar header h1');
+  if (!h1 || document.querySelector('.privado-badge')) return;
+  const b = document.createElement('span');
+  b.className = 'privado-badge';
+  b.textContent = 'Privado';
+  b.title = 'Datos locales, no se publican';
+  h1.appendChild(b);
+}
+
 function cargarFichasPrivadas() {
   if (!modoPrivadoPermitido(location.hostname)) return Promise.resolve(null);
   return fetch('data/privado/fichas.json', { cache: 'no-store' })
@@ -2650,14 +2670,7 @@ function cargarFichasPrivadas() {
       if (!d || !Array.isArray(d.fichas) || !d.fichas.length) return null;
       d.porId = Object.fromEntries(d.fichas.map(f => [f.id, f]));
       fichasPriv = d;
-      const h1 = document.querySelector('#sidebar header h1');
-      if (h1 && !document.querySelector('.privado-badge')) {
-        const b = document.createElement('span');
-        b.className = 'privado-badge';
-        b.textContent = 'Privado';
-        b.title = 'Datos locales, no se publican';
-        h1.appendChild(b);
-      }
+      ponerInsigniaPrivado();
       return d;
     })
     .catch(() => null);
@@ -2672,14 +2685,15 @@ function fichaAntiguedad(f) {
 function fichaCuandoCorta(f) {
   return f.fecha_act ? 'actualizada ' + f.fecha_act : (f.ultimo_dato ? 'sin fecha · dato más reciente ' + f.ultimo_dato : 'sin fecha');
 }
-function fichaBotones(ids) {
+function fichaBotones(ids, pid) {
+  const extra = pid != null ? ', ' + (+pid) : '';
   return ids.map(i => fichasPriv.porId[i]).filter(Boolean).map(f =>
-    `<button type="button" onclick="abrirFicha('${escAttr(f.id)}')">Ficha de yacimiento: ${escAttr(f.titulo)} · ${escAttr(fichaCuandoCorta(f))}</button>`).join('');
+    `<button type="button" onclick="abrirFicha('${escAttr(f.id)}'${extra})">Ficha de yacimiento: ${escAttr(f.titulo)} · ${escAttr(fichaCuandoCorta(f))}</button>`).join('');
 }
 function fichaPopupHTML(id) {
   const ids = fichasPriv && fichasPriv.por_pozo[id];
   if (!ids || !ids.length) return '';
-  return `<div class="ficha-pop"><div class="spark-label" title="Datos locales, no se publican">Privado · ficha técnica del yacimiento</div>${fichaBotones(ids)}</div>`;
+  return `<div class="ficha-pop"><div class="spark-label" title="Datos locales, no se publican">Privado · ficha técnica del yacimiento</div>${fichaBotones(ids, id)}</div>`;
 }
 function fichaYacHTML(nombre) {
   const ids = fichasPriv && fichasPriv.por_yacimiento[normYac(nombre)];
@@ -2702,19 +2716,23 @@ function cerrarFicha() {
 }
 function fichaEsc(e) { if (e.key === 'Escape') cerrarFicha(); }
 
-function abrirFicha(fid) {
+// Grilla etiqueta/valor del modal: filas [{g?, e, v, u?}] (g = subtítulo de grupo)
+function fmGrid(filas) {
+  const esc = escAttr;
+  let g = null;
+  return `<div class="fm-grid">` + filas.map(x => {
+    const cab = x.g && x.g !== g ? `<div class="g">${esc(x.g)}</div>` : '';
+    g = x.g || g;
+    return cab + `<span class="k">${esc(x.e)}</span><span class="v">${esc(x.v)}${x.u ? ` <span class="u">${esc(x.u)}</span>` : ''}</span>`;
+  }).join('') + `</div>`;
+}
+
+function abrirFicha(fid, pid) {
   const f = fichasPriv && fichasPriv.porId[fid];
   if (!f) return;
   cerrarFicha();
   const esc = escAttr;
-  const grid = filas => {
-    let g = null;
-    return `<div class="fm-grid">` + filas.map(x => {
-      const cab = x.g && x.g !== g ? `<div class="g">${esc(x.g)}</div>` : '';
-      g = x.g || g;
-      return cab + `<span class="k">${esc(x.e)}</span><span class="v">${esc(x.v)}${x.u ? ` <span class="u">${esc(x.u)}</span>` : ''}</span>`;
-    }).join('') + `</div>`;
-  };
+  const grid = fmGrid;
   const algunaAbierta = f.secciones.some(s => s.abierta);
   const secs = f.secciones.map((s, i) => `<details${s.abierta || (!algunaAbierta && i === 0) ? ' open' : ''} data-sec="${esc(s.id)}">
       <summary>${esc(s.titulo)}</summary><div>${grid(s.filas)}</div></details>`).join('');
@@ -2734,11 +2752,163 @@ function abrirFicha(fid) {
       <button type="button" class="fm-x" title="Cerrar (Esc)" onclick="cerrarFicha()">✕</button></div>
     <div class="fm-fecha">${fecha}<span>Datos históricos de la ficha original: no describen el estado actual del yacimiento.</span></div>
     <div class="fm-body">
-      ${grid(f.cabecera || [])}
+      ${pid != null ? baseComChip(pid) : ''}${grid(f.cabecera || [])}
       <p class="fm-nota"><span class="privado-badge" style="margin-left:0" title="Datos locales, no se publican">Privado</span>
         Datos locales y confidenciales, no se publican. Valores y unidades transcriptos tal cual de la ficha original.</p>
-      ${secs}${tablas}
+      ${secs}${tablas}${pid != null ? baseComSeccion(pid, false) : ''}
     </div></div>`;
+  m.addEventListener('click', e => { if (e.target === m) cerrarFicha(); });
+  document.body.appendChild(m);
+  document.addEventListener('keydown', fichaEsc);
+  m.querySelector('.fm-x').focus();
+}
+
+// ── Modo privado: base comercial de pozos licenciada (preprocess_base_comercial.py → data/privado/base_comercial.json) ──
+// Mismas reglas que las fichas: SOLO LOCAL, fuera de git y de public/, se pide solo desde localhost y si falta no se
+// muestra nada. Indexada por idpozo; campos categóricos como índice en `tablas`. Es una foto vieja (ver `corte`):
+// los datos son de perforación, no describen el estado actual del pozo.
+let baseCom = null;
+const BASE_COM_URL = 'data/privado/base_comercial.json';
+
+function cargarBaseComercial() {
+  if (!modoPrivadoPermitido(location.hostname)) return Promise.resolve(null);
+  return fetch(BASE_COM_URL, { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !d.pozos || !Array.isArray(d.campos) || !Object.keys(d.pozos).length) return null;
+      baseCom = d;
+      ponerInsigniaPrivado();
+      return d;
+    })
+    .catch(() => null);
+}
+
+// Registro decodificado de un pozo (idpozo) o null
+function baseComPozo(id) {
+  const fila = baseCom && baseCom.pozos[id];
+  if (!fila) return null;
+  const o = {};
+  baseCom.campos.forEach((c, i) => {
+    const v = fila[i];
+    o[c] = v == null ? null : (baseCom.tablas[c] ? baseCom.tablas[c][v] : v);
+  });
+  return o;
+}
+const baseComAnio = () => escAttr(baseCom && baseCom.corte ? baseCom.corte.slice(0, 4) : '');
+
+// El json ya viene traducido (preprocess_base_comercial.py + config local): acá no hay vocabulario de la base.
+// Precisión de las fechas (*_q): exacta, semana, mes, trimestre, semestre, año, estimada.
+const BC_METODO = {
+  nombre: 'por nombre (sigla igual al nombre de la base)',
+  nombre_sin_sufijo: 'por nombre, sin el sufijo final entre paréntesis',
+  id: 'por identificador alternativo de la base igual al idpozo',
+  distancia_prof: 'cruce por proximidad (verificar): profundidad final y fecha compatibles con el Cap. IV',
+  distancia: 'cruce por proximidad (verificar): único candidato a ≤ 50 m, sin profundidad para comparar',
+};
+const BC_METODO_CORTO = {
+  nombre: 'Cruce por nombre', nombre_sin_sufijo: 'Cruce por nombre (sin sufijo)', id: 'Cruce por identificador',
+  distancia_prof: 'Cruce por proximidad (verificar)', distancia: 'Cruce por proximidad (verificar)',
+};
+
+// Fecha según su precisión: exacta dd/mm/aaaa, mes mm/aaaa, trimestre/año aaaa, estimada "≈ aaaa (estimada)"
+function bcFecha(iso, q) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-');
+  if (!q || q === 'exacta' || q === 'semana') return `${d}/${m}/${y}`;
+  if (q === 'mes') return `${m}/${y}`;
+  if (q === 'estimada') return `≈ ${y} (estimada)`;
+  return y;
+}
+const bcMetros = v => (v == null ? null : fmtNum(Math.round(v)) + ' m');
+
+function baseComResumen(o) {
+  const p = [];
+  const sp = bcFecha(o.spud, o.spud_q);
+  if (sp) p.push('Spud ' + sp);
+  if (o.td) p.push('TD ' + bcMetros(o.td));
+  else if (o.ptd) p.push('PTD ' + bcMetros(o.ptd));
+  return p.length ? p.join(' · ') : 'Datos de perforación';
+}
+
+function baseComPopupHTML(id) {
+  const o = baseComPozo(id);
+  if (!o) return '';
+  const prox = /^distancia/.test(o.metodo) ? ' · proximidad (verificar)' : '';
+  return `<div class="ficha-pop bc-pop"><div class="spark-label" title="Datos locales, no se publican">Privado · base comercial (${baseComAnio()})${prox}</div>`
+    + `<button type="button" onclick="abrirBaseCom(${+id})">${escAttr(baseComResumen(o))}</button></div>`;
+}
+
+// Filas {g, e, v, u?} de un pozo, solo los campos con dato
+function baseComFilas(o) {
+  const F = [];
+  const add = (g, e, v, u) => { if (v != null && v !== '') F.push({ g, e, v: String(v), u }); };
+  const fq = (iso, q) => { const f = bcFecha(iso, q); return f && q && q !== 'estimada' ? `${f} (precisión: ${q})` : f; };
+  let g = 'Identificación';
+  add(g, 'Nombre en la base', o.nombre); add(g, 'Nombre alternativo', o.alt); add(g, 'Id en la base', o.uid);
+  add(g, 'Operador (en la base)', o.op); add(g, 'Socios', o.socios); add(g, 'Yacimiento', o.yac); add(g, 'Bloque', o.bloque);
+  add(g, 'Contrato', o.contrato); add(g, 'Provincia', o.prov); add(g, 'Cuenca', o.cuenca); add(g, 'Ambiente', o.ambiente);
+  g = 'Perforación';
+  add(g, 'Spud (inicio)', fq(o.spud, o.spud_q)); add(g, 'Fin de perforación (TD)', fq(o.td_fecha, o.td_fecha_q));
+  add(g, 'Fin de operaciones', fq(o.fin, o.fin_q)); add(g, 'Nota de fechas', o.fechas_nota);
+  add(g, 'Profundidad final (TD)', bcMetros(o.td)); add(g, 'Profundidad vertical (TVD)', bcMetros(o.tvd));
+  add(g, 'Profundidad programada (PTD)', bcMetros(o.ptd)); add(g, 'PTD vertical', bcMetros(o.ptvd));
+  add(g, 'Nota de profundidad', o.prof_nota); add(g, 'Cota del terreno', bcMetros(o.cota)); add(g, 'Profundidad del agua', bcMetros(o.agua));
+  add(g, 'Tipo de pozo (trayectoria)', o.desv); add(g, 'Equipo', o.equipo); add(g, 'Contratista', o.contratista);
+  g = 'Clasificación y estado';
+  add(g, 'Clasificación', o.clase); add(g, 'Nota de clasificación', o.clase_nota); add(g, 'Estado técnico', o.estado);
+  add(g, 'Contenido', o.contenido); add(g, 'Comentario de estado', o.estado_com); add(g, 'No convencional', o.nc);
+  add(g, 'Pozo descubridor', o.descubridor);
+  g = 'Objetivo';
+  add(g, 'Formación objetivo', o.obj_form); add(g, 'Edad', o.obj_edad); add(g, 'Litología', o.obj_lito);
+  add(g, 'Nota del objetivo', o.obj_nota); add(g, 'Formación de fondo', o.fondo_form);
+  g = 'Ensayos y comentarios';
+  add(g, 'Ensayo', o.ensayo); add(g, 'Comentario', o.comentario);
+  g = 'Cruce con el visor';
+  add(g, 'Método', BC_METODO[o.metodo] || o.metodo);
+  add(g, 'Distancia entre coordenadas', bcMetros(o.dist));
+  add(g, 'Distancia tras corregir el corrimiento local', bcMetros(o.dist_corr));
+  add(g, 'Candidatos considerados', o.candidatos);
+  add(g, 'Datum declarado en la base', o.datum);
+  return F;
+}
+
+// Contenido de la base comercial de un pozo: notas + grilla. `propio`: modal propio (sin <details>, el título ya
+// dice "Base comercial"); si no, <details id="fm-base-comercial"> dentro de la ficha de yacimiento.
+function baseComSeccion(id, propio) {
+  const o = baseComPozo(id);
+  if (!o) return '';
+  const aviso = o.dist > 150
+    ? `<p class="fm-nota">Aviso: las coordenadas difieren ${escAttr(bcMetros(o.dist))}. En la base son habituales corrimientos de datum de 150–450 m; verificar si el dato es clave.</p>`
+    : '';
+  const prox = /^distancia/.test(o.metodo)
+    ? `<p class="fm-nota">Cruce por proximidad (verificar): menos seguro que por nombre.</p>` : '';
+  const cuerpo = `<p class="fm-nota"><span class="privado-badge" style="margin-left:0" title="Datos locales, no se publican">Privado</span>
+      Base comercial licenciada, foto al ${escAttr(baseCom.corte || '?')}: datos de perforación, no el estado actual. No se publica.</p>
+    ${aviso}${prox}${fmGrid(baseComFilas(o))}`;
+  return propio
+    ? `<div data-sec="base-comercial">${cuerpo}</div>`
+    : `<details open id="fm-base-comercial" data-sec="base-comercial"><summary>Base comercial del pozo (${baseComAnio()})</summary><div>${cuerpo}</div></details>`;
+}
+
+// Chip arriba de la ficha de yacimiento (abierta desde un pozo con dato) que salta a la sección del pozo
+function baseComChip(id) {
+  if (!baseComPozo(id)) return '';
+  return `<p><a href="#fm-base-comercial" class="fm-chip" onclick="event.preventDefault(); document.getElementById('fm-base-comercial').scrollIntoView({behavior: 'smooth', block: 'start'})">Base comercial del pozo ↓</a></p>`;
+}
+
+function abrirBaseCom(id) {
+  const o = baseComPozo(id);
+  if (!o) return;
+  cerrarFicha();
+  const r = window.POZOS.find(x => x[I.id] === +id);
+  const sigla = r ? r[I.sigla] : '';
+  const m = document.createElement('div');
+  m.id = 'ficha-modal';
+  m.innerHTML = `<div class="fm-box" role="dialog" aria-modal="true" aria-labelledby="fm-titulo">
+    <div class="fm-head"><div><h2 id="fm-titulo">Base comercial (${baseComAnio()}) · ${escAttr(sigla)}</h2>
+      <div class="fm-sub">${escAttr(BC_METODO_CORTO[o.metodo] || o.metodo)} · ${escAttr(bcMetros(o.dist))} · idpozo ${+id}</div></div>
+      <button type="button" class="fm-x" title="Cerrar (Esc)" onclick="cerrarFicha()">✕</button></div>
+    <div class="fm-body">${baseComSeccion(id, true)}</div></div>`;
   m.addEventListener('click', e => { if (e.target === m) cerrarFicha(); });
   document.body.appendChild(m);
   document.addEventListener('keydown', fichaEsc);
@@ -2752,6 +2922,7 @@ loadCuencasPanel();
 applyFilters();
 document.getElementById('loading').style.display = 'none';
 cargarFichasPrivadas();
+cargarBaseComercial();
 </script>
 </body>
 </html>

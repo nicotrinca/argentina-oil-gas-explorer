@@ -86,6 +86,40 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
    idpozo que declaró ese `areayacimiento`) y en la capa Yacimientos (`por_yacimiento`, nombre normalizado), modal
    `abrirFicha(id)` con la fecha de actualización destacada. No está en `tools/actualizar.py` (se corre a mano).
    El servidor local escucha solo en 127.0.0.1 (`abrir.bat`, `.claude/launch.json`): data/privado no queda en la LAN.
+9. `preprocess_base_comercial.py "<ruta.shp>" [config]` (o env `BASE_COMERCIAL_SHP` / `BASE_COMERCIAL_CONFIG`; después de
+   peryear, lee `pozos_<AÑO>.js` y `capitulo-iv-pozos.csv`, ~20 s) → `data/privado/base_comercial.json` (~6,3 MB).
+   **MODO PRIVADO, SOLO LOCAL**: base comercial de pozos LICENCIADA (shapefile de puntos con fechas de perforación,
+   TD/PTD, cota, clasificación, trayectoria, estado, objetivo, ensayos). Mismas guardas que las fichas. En código, tests
+   y docs: nunca el nombre del proveedor, la ruta del shapefile, nombres de columnas, el vocabulario de la base ni nombres
+   de pozos; decir "base comercial". Esquema en el docstring.
+   - El esquema del proveedor vive en `data/privado/config_base_comercial.json` (local, como `plantilla_fichas.json`;
+     formato en el docstring; sin ese archivo el script no corre): columnas → claves genéricas, escala de precisión de
+     fechas → códigos (exacta, semana, mes, trimestre, semestre, año, estimada) y traducciones (exactas, regex, y por
+     tokens para listas de litología). El json sale YA traducido: `index.html` no tiene ningún término de la base.
+   - Cruce por idpozo (cada pozo del visor con ≤ 1 registro): nombre (sigla normalizada = nombre alternativo u oficial)
+     a ≤ 1 km → nombre sin el sufijo final entre paréntesis (vetado si la sigla dice (h)/(d) y la base dice vertical sin
+     sufijo, salvo profundidad del Cap. IV ±5 % de la TD) → id alternativo de la base = idpozo → proximidad. Un registro
+     solo se comparte entre idpozo en el mismo lugar (≤ 50 m: mismo pozo físico con varios idpozo en el Cap. IV).
+   - La base tiene corrimientos de datum sistemáticos (Golfo San Jorge ≈ 440 m al este; Neuquina ≈ 150 m): por eso
+     1 km para nombre. La proximidad corrige el corrimiento local (mediana de los vecinos cruzados a ≤ 5 km), busca a
+     ≤ 150 m y EXIGE TD (no PTD) a ±5 % de la profundidad del Cap. IV y spud compatible con el inicio de perforación
+     (±90 días exacta/semana/mes, ±1 año trimestre/semestre/año, ±2 años estimada); sin profundidad, único candidato a
+     ≤ 50 m. Sin esas condiciones, ~55 % de los cruces por proximidad eran el vecino. En la UI: "cruce por proximidad
+     (verificar)", nunca "confirmado".
+   - Los pozos que empezaron a perforarse después del corte de la base (fecha del Cap. IV) no se cruzan.
+   - Cobertura 2026-11: 82,8 % de los 32.417 pozos del visor (26.857); 96,3 % de los perforados antes del corte (casi
+     todos los sin match son posteriores). El script imprime la tabla por cuenca y método (sin nombres de pozos).
+   - Visor (`baseCom`, `cargarBaseComercial`): línea "Spud … · TD … m" en el popup (`baseComPopupHTML`, caja `.bc-pop`
+     con el estilo de la ficha), modal `abrirBaseCom(id)` (subtítulo "Cruce por nombre · 5 m") y, en la ficha de
+     yacimiento abierta desde el popup (`abrirFicha(fid, idpozo)`), chip "Base comercial del pozo ↓" arriba y sección al
+     final. Fechas según precisión (estimadas como "≈ aaaa (estimada)"). Aviso si las coordenadas difieren > 150 m o si
+     el cruce fue por proximidad. En celular (≤ 760 px) las grillas del modal se apilan.
+   - `tools/privado.mjs` (`valoresBaseComercial`, `paresBaseComercial`) detecta en public/: el archivo, nombres oficiales
+     (literal), ids propios, textos libres ≥ 20 caracteres como substring (por tokens, no includes por valor) y PARES
+     idpozo ↔ TD/spud de la base (`huellas`: muestra de 2000 pozos con TD/spud distintos de los del Cap. IV; fuga si
+     ≥ 20 pares y ≥ 20 % de los idpozo de la muestra presentes en el archivo). Suma ~2 s al build.
+   - `tools/check.mjs` toma un pozo con dato del json en tiempo de ejecución ("base comercial ok"). Probar también SIN
+     `data/privado/` (renombrar la carpeta, correr check.mjs, restaurarla): todo debe dar verde.
 
 ## Actualización mensual
 - `tools/actualizar.py` (docstring = manual completo): consulta CKAN, baja lo que cambió (registro en
@@ -187,6 +221,8 @@ Orden de los scripts (cada uno lee `data/` crudo y escribe `data/` procesado):
 - 2026-11-12: zonas productivas VM (hexágonos por EUR/km, tabla por concesión) e interferencia padre/hijo
   (`preprocess_zonas.py`, sección al final de Curvas, línea en el popup). Revisión: clic en pozos con la capa
   prendida, clusters translúcidos, sensibilidad hijo ≥ 12 meses. check.mjs: 35 chequeos.
+- 2026-11-12: modo privado local (fichas de yacimiento) y base comercial licenciada (paso 9). check.mjs: 50 chequeos,
+  verde con y sin `data/privado/`.
 
 ## Pendiente conocido
 - Concesiones solapadas: LOMA LA LATA - SIERRA BARROSA y LA ANGOSTURA SUR I salen con los mismos 57 pozos.
